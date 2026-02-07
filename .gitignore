@@ -1,0 +1,48 @@
+# Зависимости
+node_modules/
+
+# Сборка приложения (Vite)
+dist/
+dist-ssr/
+
+# Кэш Vite и пре-бандл зависимостей
+.vite/
+
+# Артефакты TypeScript
+*.tsbuildinfo
+
+# Логи и отладочные файлы
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# Локальные переменные окружения (ключи, секреты)
+.env
+.env.local
+.env.*.local
+
+# Редакторы и IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Системные файлы macOS
+.DS_Store
+
+# Системные файлы Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Отчёты покрытия тестами (если появятся тесты)
+coverage/
+*.lcov
+
+# Временные файлы
+*.tmp
+*.temp
+.cache/
