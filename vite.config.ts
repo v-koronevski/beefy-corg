@@ -4,8 +4,8 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
-  // Для GitHub Pages: базовый путь = имя репозитория (замените на своё, если репо другое)
-  base: '/pwa-test/',
+  // GitHub Pages: https://v-koronevski.github.io/beefy-corg/
+  base: '/beefy-corg/',
   plugins: [
     react(),
     VitePWA({
