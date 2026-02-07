@@ -1,5 +1,5 @@
 import { getWorkoutById } from '@/data/helenPlan'
-import type { WorkoutHistoryEntry } from '@/types'
+import type { WorkoutHistoryEntry, BodyMeasurementEntry, BodyMeasurementKey } from '@/types'
 
 /** Стартовые веса по упражнениям (кг), затем лёгкая прогрессия по неделям */
 const BASE_WEIGHTS: Record<string, number> = {
@@ -103,6 +103,64 @@ export function seedWorkoutHistory(): WorkoutHistoryEntry[] {
       workoutId,
       workoutName: workout.name,
       exercises,
+    })
+  }
+
+  return entries.sort((a, b) => a.date.localeCompare(b.date))
+}
+
+/** Базовые значения замеров (см, вес в кг), от которых идёт лёгкая динамика */
+const MEASUREMENT_BASE: Record<BodyMeasurementKey, number> = {
+  weight: 66,
+  chest: 92,
+  waist: 72,
+  hips: 98,
+  bicep: 28,
+  thigh: 54,
+}
+
+/** Небольшая случайная вариация ±n для реалистичности */
+function vary(value: number, range: number): number {
+  return Math.round((value + (Math.random() - 0.5) * 2 * range) * 10) / 10
+}
+
+function toDateStrForMeasurements(d: Date): string {
+  return d.toISOString().slice(0, 10)
+}
+
+/**
+ * Генерирует историю замеров за последние ~10 недель (1–2 замера в неделю).
+ * Вес и талия слегка снижаются, остальное с небольшой вариацией.
+ */
+export function seedBodyMeasurements(): BodyMeasurementEntry[] {
+  const entries: BodyMeasurementEntry[] = []
+  const end = new Date()
+  end.setHours(0, 0, 0, 0)
+  const start = new Date(end)
+  start.setDate(start.getDate() - 70)
+
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const dayOfWeek = d.getDay()
+    // Замеры примерно 1–2 раза в неделю (например, понедельник и четверг)
+    if (dayOfWeek !== 1 && dayOfWeek !== 4) continue
+    if (Math.random() > 0.85) continue
+
+    const weeksFromStart = (d.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000)
+    const progress = Math.min(weeksFromStart / 10, 1)
+
+    const weightTrend = MEASUREMENT_BASE.weight - progress * 2
+    const waistTrend = MEASUREMENT_BASE.waist - progress * 2.5
+
+    entries.push({
+      date: toDateStrForMeasurements(d),
+      values: {
+        weight: vary(weightTrend, 0.8),
+        chest: vary(MEASUREMENT_BASE.chest, 1),
+        waist: vary(waistTrend, 1),
+        hips: vary(MEASUREMENT_BASE.hips, 1.5),
+        bicep: vary(MEASUREMENT_BASE.bicep, 0.5),
+        thigh: vary(MEASUREMENT_BASE.thigh, 1),
+      },
     })
   }
 

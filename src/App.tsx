@@ -22,6 +22,7 @@ import { OnboardingProgramChoice } from '@/components/onboarding/OnboardingProgr
 import { OnboardingWeights } from '@/components/onboarding/OnboardingWeights'
 import { ActiveWorkoutView } from '@/components/workout/ActiveWorkoutView'
 import { ProgressPage } from '@/components/progress/ProgressPage'
+import { MeasurementsPage } from '@/components/measurements/MeasurementsPage'
 import { SettingsPage } from '@/components/settings/SettingsPage'
 import type { ExerciseRating } from '@/components/workout/ActiveWorkoutView'
 
@@ -43,7 +44,9 @@ export default function App() {
     workoutName: string
     exercises: ReturnType<typeof cloneExercises>
   } | null>(null)
-  const [mainTab, setMainTab] = useState<'workouts' | 'progress' | 'settings'>('workouts')
+  const [mainTab, setMainTab] = useState<'workouts' | 'progress' | 'measurements' | 'settings'>('workouts')
+
+  const isSettingsOpen = mainTab === 'settings'
 
   const handleOnboardingComplete = (planId: string, weights: Record<string, number>) => {
     const plan = getPlanById(planId)
@@ -73,7 +76,7 @@ export default function App() {
     const currentWeights = getNextWeights(planId)
     const nextWeights = { ...currentWeights }
     for (const ex of activeWorkout.exercises) {
-      if (ex.durationSec) continue
+      if (ex.durationSec || ex.bodyweight) continue
       const current = nextWeights[ex.id] ?? ex.sets[0]?.weightKg ?? 0
       const choice = ratings[ex.id] ?? 'same'
       nextWeights[ex.id] = getNextWeightKg(choice, current, ex.id)
@@ -116,6 +119,7 @@ export default function App() {
         <OnboardingWeights
           exerciseIds={exerciseIds}
           plan={plan}
+          onBack={() => setSelectedPlanId(null)}
           onComplete={(weights) => handleOnboardingComplete(selectedPlanId, weights)}
         />
       </div>
@@ -155,45 +159,92 @@ export default function App() {
         className="bg-beefy-cream-light dark:bg-beefy-dark-bg text-beefy-primary dark:text-beefy-dark-text py-3 px-4 shadow shrink-0 min-w-0 border-b border-beefy-primary/10 dark:border-beefy-dark-border"
         style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
       >
-        <div className="flex flex-wrap items-center gap-2 sm:gap-4">
-          <img src="/logo.png" alt="" className="h-9 w-9 rounded-lg shrink-0 object-contain" />
-          <h1 className="text-base sm:text-lg font-semibold">BeefyCorg</h1>
-          <nav className="flex gap-1 min-h-[44px] items-center">
+        {isSettingsOpen ? (
+          <div className="flex items-center gap-2 min-h-[44px]">
             <button
               type="button"
               onClick={() => setMainTab('workouts')}
-              className={`px-3 py-2.5 sm:py-1.5 rounded-lg text-sm font-medium touch-manipulation ${
-                mainTab === 'workouts' ? 'bg-beefy-primary/10 dark:bg-beefy-dark-border/50 text-beefy-primary dark:text-beefy-dark-text' : 'text-beefy-text-secondary dark:text-beefy-dark-text-muted hover:text-beefy-primary dark:hover:text-beefy-dark-text'
-              }`}
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center -ml-2 rounded-lg text-beefy-text-secondary dark:text-beefy-dark-text-muted hover:text-beefy-primary dark:hover:text-beefy-dark-text touch-manipulation"
+              aria-label="Назад"
             >
-              Тренировки
+              ←
             </button>
-            <button
-              type="button"
-              onClick={() => setMainTab('progress')}
-              className={`px-3 py-2.5 sm:py-1.5 rounded-lg text-sm font-medium touch-manipulation ${
-                mainTab === 'progress' ? 'bg-beefy-primary/10 dark:bg-beefy-dark-border/50 text-beefy-primary dark:text-beefy-dark-text' : 'text-beefy-text-secondary dark:text-beefy-dark-text-muted hover:text-beefy-primary dark:hover:text-beefy-dark-text'
-              }`}
-            >
-              Прогресс
-            </button>
+            <h1 className="text-base sm:text-lg font-semibold">Настройки</h1>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-3 min-w-0">
+            <div className="flex items-center gap-2 min-w-0 shrink-0">
+              <img src={`${import.meta.env.BASE_URL}logo.png`} alt="" className="h-9 w-9 rounded-lg shrink-0 object-contain" />
+              <h1 className="text-base sm:text-lg font-semibold truncate">BeefyCorg</h1>
+            </div>
             <button
               type="button"
               onClick={() => setMainTab('settings')}
-              className={`px-3 py-2.5 sm:py-1.5 rounded-lg text-sm font-medium touch-manipulation ${
-                mainTab === 'settings' ? 'bg-beefy-primary/10 dark:bg-beefy-dark-border/50 text-beefy-primary dark:text-beefy-dark-text' : 'text-beefy-text-secondary dark:text-beefy-dark-text-muted hover:text-beefy-primary dark:hover:text-beefy-dark-text'
-              }`}
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-beefy-text-secondary dark:text-beefy-dark-text-muted hover:bg-beefy-primary/10 dark:hover:bg-beefy-dark-border/30 hover:text-beefy-primary dark:hover:text-beefy-dark-text touch-manipulation"
+              aria-label="Настройки"
             >
-              Настройки
+              <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
             </button>
-          </nav>
-        </div>
+          </div>
+        )}
       </header>
+      {!isSettingsOpen && (
+        <nav
+          className="flex min-h-[48px] items-stretch gap-1 px-4 py-2 bg-beefy-cream-light dark:bg-beefy-dark-bg border-b border-beefy-primary/10 dark:border-beefy-dark-border shrink-0"
+          role="tablist"
+          aria-label="Разделы"
+        >
+          <button
+            role="tab"
+            aria-selected={mainTab === 'workouts'}
+            type="button"
+            onClick={() => setMainTab('workouts')}
+            className={`flex-1 min-h-[40px] rounded-xl text-sm font-medium touch-manipulation transition-colors ${
+              mainTab === 'workouts'
+                ? 'bg-beefy-primary dark:bg-beefy-accent text-beefy-cream dark:text-white shadow-sm'
+                : 'text-beefy-text-secondary dark:text-beefy-dark-text-muted hover:bg-beefy-primary/10 dark:hover:bg-beefy-dark-border/30 hover:text-beefy-primary dark:hover:text-beefy-dark-text'
+            }`}
+          >
+            Тренировки
+          </button>
+          <button
+            role="tab"
+            aria-selected={mainTab === 'progress'}
+            type="button"
+            onClick={() => setMainTab('progress')}
+            className={`flex-1 min-h-[40px] rounded-xl text-sm font-medium touch-manipulation transition-colors ${
+              mainTab === 'progress'
+                ? 'bg-beefy-primary dark:bg-beefy-accent text-beefy-cream dark:text-white shadow-sm'
+                : 'text-beefy-text-secondary dark:text-beefy-dark-text-muted hover:bg-beefy-primary/10 dark:hover:bg-beefy-dark-border/30 hover:text-beefy-primary dark:hover:text-beefy-dark-text'
+            }`}
+          >
+            Прогресс
+          </button>
+          <button
+            role="tab"
+            aria-selected={mainTab === 'measurements'}
+            type="button"
+            onClick={() => setMainTab('measurements')}
+            className={`flex-1 min-h-[40px] rounded-xl text-sm font-medium touch-manipulation transition-colors ${
+              mainTab === 'measurements'
+                ? 'bg-beefy-primary dark:bg-beefy-accent text-beefy-cream dark:text-white shadow-sm'
+                : 'text-beefy-text-secondary dark:text-beefy-dark-text-muted hover:bg-beefy-primary/10 dark:hover:bg-beefy-dark-border/30 hover:text-beefy-primary dark:hover:text-beefy-dark-text'
+            }`}
+          >
+            Замеры
+          </button>
+        </nav>
+      )}
       <main className="flex-1 p-4 min-h-0 min-w-0 overflow-auto w-full max-w-full bg-beefy-cream-light dark:bg-beefy-dark-bg text-beefy-primary dark:text-beefy-dark-text">
-        {mainTab === 'settings' ? (
+        {isSettingsOpen ? (
           <SettingsPage />
         ) : mainTab === 'progress' ? (
           <ProgressPage />
+        ) : mainTab === 'measurements' ? (
+          <MeasurementsPage />
         ) : hasSchedule ? (
           <UpcomingWorkouts onStartWorkout={handleStartWorkout} />
         ) : (

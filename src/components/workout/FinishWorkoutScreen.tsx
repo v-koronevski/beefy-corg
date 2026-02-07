@@ -19,7 +19,7 @@ export function FinishWorkoutScreen({
     const list: ExerciseNextWeight[] = []
     const seen = new Set<string>()
     for (const ex of exercises) {
-      if (ex.durationSec || seen.has(ex.id)) continue
+      if (ex.durationSec || ex.bodyweight || seen.has(ex.id)) continue
       seen.add(ex.id)
       const current = currentWeights[ex.id] ?? ex.sets[0]?.weightKg ?? 0
       list.push({

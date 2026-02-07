@@ -4,6 +4,7 @@ import type { WorkoutPlan } from '@/types'
 interface OnboardingWeightsProps {
   exerciseIds: string[]
   plan: WorkoutPlan
+  onBack: () => void
   onComplete: (weights: Record<string, number>) => void
 }
 
@@ -17,7 +18,7 @@ function buildNameMap(plan: WorkoutPlan): Record<string, string> {
   return map
 }
 
-export function OnboardingWeights({ exerciseIds, plan, onComplete }: OnboardingWeightsProps) {
+export function OnboardingWeights({ exerciseIds, plan, onBack, onComplete }: OnboardingWeightsProps) {
   const nameMap = useMemo(() => buildNameMap(plan), [plan])
   const [weights, setWeights] = useState<Record<string, number>>(() => {
     const init: Record<string, number> = {}
@@ -38,7 +39,17 @@ export function OnboardingWeights({ exerciseIds, plan, onComplete }: OnboardingW
 
   return (
     <div className="max-w-md mx-auto py-6 px-4 w-full min-w-0">
-      <h2 className="text-lg sm:text-xl font-semibold text-beefy-primary dark:text-beefy-dark-text mb-2">Стартовые веса</h2>
+      <div className="flex items-center gap-2 mb-4">
+        <button
+          type="button"
+          onClick={onBack}
+          className="min-h-[44px] min-w-[44px] flex items-center justify-center -ml-2 rounded-lg text-beefy-text-secondary dark:text-beefy-dark-text-muted hover:text-beefy-primary dark:hover:text-beefy-dark-text touch-manipulation"
+          aria-label="Назад"
+        >
+          ←
+        </button>
+        <h2 className="text-lg sm:text-xl font-semibold text-beefy-primary dark:text-beefy-dark-text">Стартовые веса</h2>
+      </div>
       <p className="text-beefy-text-secondary dark:text-beefy-dark-text-muted text-sm mb-6">
         Укажите рабочие веса (кг) для каждого упражнения. Для упражнений без веса (планка, пресс) можно оставить 0.
       </p>

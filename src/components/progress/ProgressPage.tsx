@@ -13,32 +13,52 @@ import {
   getHistoryByWeek,
   MUSCLE_GROUP_NAMES,
 } from '@/utils/progressStats'
-import { getSchedule, setWorkoutHistory } from '@/utils/storage'
+import { getSchedule, setWorkoutHistory, getBodyMeasurements } from '@/utils/storage'
 import { getExerciseNameByIdFromPlan } from '@/data/plans'
 import { seedWorkoutHistory } from '@/dev/seedHistory'
 import { useTheme } from '@/hooks/useTheme'
-import type { MuscleGroupId } from '@/types'
+import { ProgressHistory } from './ProgressHistory'
+import type { MuscleGroupId, BodyMeasurementKey } from '@/types'
+
+const MEASUREMENT_LABELS: Record<BodyMeasurementKey, string> = {
+  weight: 'Вес',
+  chest: 'Грудь',
+  waist: 'Талия',
+  hips: 'Бёдра',
+  bicep: 'Бицепс',
+  thigh: 'Бедро',
+}
+const MEASUREMENT_KEYS: BodyMeasurementKey[] = ['weight', 'chest', 'waist', 'hips', 'bicep', 'thigh']
+function getMeasurementUnit(key: BodyMeasurementKey): string {
+  return key === 'weight' ? 'кг' : 'см'
+}
+function formatDateShort(dateStr: string): string {
+  return new Date(dateStr + 'T12:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
+}
+
+export type ProgressSubTab = 'charts' | 'history'
 
 const isDev = import.meta.env.DEV
 
-const COLOR_VOLUME = '#0f766e'
-const COLOR_WEIGHT = '#1d4ed8'
-const COLOR_1RM = '#b45309'
+const COLOR_VOLUME = '#0d9488'
+const COLOR_WEIGHT = '#2563eb'
+const COLOR_1RM = '#ea580c'
+const COLOR_MEASUREMENTS = '#0d9488'
 
 const CHART_MIN_WIDTH = 480
 const CHART_HEIGHT = 260
 const CHART_MARGIN = { top: 12, right: 40, left: 8, bottom: 24 }
 
 const CHART_LIGHT = {
-  grid: '#e2e8f0',
-  axis: '#64748b',
-  cursor: '#94a3b8',
-  tooltipBg: undefined as string | undefined,
+  grid: '#cbd5e1',
+  axis: '#334155',
+  cursor: '#475569',
+  tooltipBg: '#f8fafc',
 }
 const CHART_DARK = {
   grid: '#475569',
-  axis: '#94a3b8',
-  cursor: '#cbd5e1',
+  axis: '#e2e8f0',
+  cursor: '#94a3b8',
   tooltipBg: '#1e293b',
 }
 
@@ -76,11 +96,12 @@ function formatPeriodWeek(weekStart: string): string {
   return `${d.getDate()}.${d.getMonth() + 1} – ${end.getDate()}.${end.getMonth() + 1}`
 }
 
-type ViewMode = 'exercise' | 'muscle'
+type ViewMode = 'exercise' | 'muscle' | 'measurements'
 type PeriodMode = 'workout' | 'week'
 
 export function ProgressPage() {
   const { isDark } = useTheme()
+  const [subTab, setSubTab] = useState<ProgressSubTab>('charts')
   const [viewMode, setViewMode] = useState<ViewMode>('exercise')
   const [periodMode, setPeriodMode] = useState<PeriodMode>('workout')
   const [refresh, setRefresh] = useState(0)
@@ -97,6 +118,24 @@ export function ProgressPage() {
   }
 
   const { chartData, keys, exerciseChartData } = useMemo(() => {
+    if (viewMode === 'measurements') {
+      const entries = getBodyMeasurements()
+        .filter((e) => MEASUREMENT_KEYS.some((k) => (e.values[k] ?? 0) > 0))
+        .sort((a, b) => a.date.localeCompare(b.date))
+      const chartData = entries.map((e) => ({
+        date: e.date,
+        period: formatDateShort(e.date),
+        _sort: e.date,
+        ...e.values,
+      }))
+      const keysWithData = MEASUREMENT_KEYS.filter((k) => chartData.some((row) => (row[k] ?? 0) > 0))
+      return {
+        chartData,
+        keys: keysWithData.map((id) => ({ id, name: `${MEASUREMENT_LABELS[id]}, ${getMeasurementUnit(id)}` })),
+        exerciseChartData: null as Record<string, string | number | null>[] | null,
+      }
+    }
+
     const byWorkout = periodMode === 'workout'
     const raw = byWorkout ? byDay : byWeek
     const periodKey = byWorkout ? 'date' : 'weekStart'
@@ -164,28 +203,81 @@ export function ProgressPage() {
     }
   }, [viewMode, periodMode, byDay, byWeek])
 
-  if (chartData.length === 0) {
+  const subNav = (
+    <div className="flex min-h-[40px] items-stretch rounded-xl bg-beefy-primary/10 dark:bg-beefy-dark-border/30 p-1 w-full sm:w-auto sm:max-w-[240px] mb-4">
+      <button
+        type="button"
+        onClick={() => setSubTab('charts')}
+        className={`flex-1 min-h-[36px] rounded-lg text-sm font-medium touch-manipulation transition-colors ${
+          subTab === 'charts'
+            ? 'bg-beefy-primary dark:bg-beefy-accent text-beefy-cream dark:text-white shadow-sm'
+            : 'text-beefy-text-secondary dark:text-beefy-dark-text-muted hover:text-beefy-primary dark:hover:text-beefy-dark-text'
+        }`}
+      >
+        Графики
+      </button>
+      <button
+        type="button"
+        onClick={() => setSubTab('history')}
+        className={`flex-1 min-h-[36px] rounded-lg text-sm font-medium touch-manipulation transition-colors ${
+          subTab === 'history'
+            ? 'bg-beefy-primary dark:bg-beefy-accent text-beefy-cream dark:text-white shadow-sm'
+            : 'text-beefy-text-secondary dark:text-beefy-dark-text-muted hover:text-beefy-primary dark:hover:text-beefy-dark-text'
+        }`}
+      >
+        История
+      </button>
+    </div>
+  )
+
+  if (subTab === 'history') {
     return (
-      <div className="py-8 text-center text-slate-500 dark:text-beefy-dark-text-muted space-y-4">
-        <div>
-          <p className="font-medium">Нет данных для графиков</p>
-          <p className="text-sm mt-1">Завершите тренировки и сохраняйте результаты — здесь появится прогрессия по объёму.</p>
+      <div className="space-y-6 w-full max-w-xl min-w-0">
+        {subNav}
+        <ProgressHistory />
+      </div>
+    )
+  }
+
+  if (chartData.length === 0) {
+    const isMeasurements = viewMode === 'measurements'
+    return (
+      <div className="space-y-6 w-full max-w-xl min-w-0">
+        {subNav}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-slate-600 dark:text-beefy-dark-text-muted text-sm mr-0 w-full sm:w-auto sm:mr-2">Показать:</span>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => setViewMode('exercise')} className="min-h-[44px] px-3 py-2.5 rounded-lg text-sm font-medium touch-manipulation bg-slate-100 dark:bg-beefy-dark-border/30 text-slate-600 dark:text-beefy-dark-text-muted">По упражнениям</button>
+            <button type="button" onClick={() => setViewMode('muscle')} className="min-h-[44px] px-3 py-2.5 rounded-lg text-sm font-medium touch-manipulation bg-slate-100 dark:bg-beefy-dark-border/30 text-slate-600 dark:text-beefy-dark-text-muted">По группам мышц</button>
+            <button type="button" onClick={() => setViewMode('measurements')} className="min-h-[44px] px-3 py-2.5 rounded-lg text-sm font-medium touch-manipulation bg-slate-100 dark:bg-beefy-dark-border/30 text-slate-600 dark:text-beefy-dark-text-muted">Замеры</button>
+          </div>
         </div>
-        {isDev && (
-          <button
-            type="button"
-            onClick={handleSeedHistory}
-            className="min-h-[44px] px-4 py-2.5 rounded-lg bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 text-sm font-medium border border-amber-300 dark:border-amber-700 touch-manipulation"
-          >
-            Заполнить историю (dev)
-          </button>
-        )}
+        <div className="py-8 text-center text-slate-500 dark:text-beefy-dark-text-muted space-y-4">
+          <div>
+            <p className="font-medium">{isMeasurements ? 'Нет данных замеров' : 'Нет данных для графиков'}</p>
+            <p className="text-sm mt-1">
+              {isMeasurements
+                ? 'Добавьте замеры на вкладке «Замеры» — здесь появятся графики изменений.'
+                : 'Завершите тренировки и сохраняйте результаты — здесь появится прогрессия по объёму.'}
+            </p>
+          </div>
+          {isDev && !isMeasurements && (
+            <button
+              type="button"
+              onClick={handleSeedHistory}
+              className="min-h-[44px] px-4 py-2.5 rounded-lg bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 text-sm font-medium border border-amber-300 dark:border-amber-700 touch-manipulation"
+            >
+              Заполнить историю (dev)
+            </button>
+          )}
+        </div>
       </div>
     )
   }
 
   return (
     <div className="space-y-6 w-full max-w-xl min-w-0">
+      {subNav}
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-slate-600 dark:text-beefy-dark-text-muted text-sm mr-0 w-full sm:w-auto sm:mr-2">Показать:</span>
         <div className="flex flex-wrap gap-2">
@@ -207,8 +299,18 @@ export function ProgressPage() {
           >
             По группам мышц
           </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('measurements')}
+            className={`min-h-[44px] px-3 py-2.5 rounded-lg text-sm font-medium touch-manipulation ${
+              viewMode === 'measurements' ? 'bg-beefy-cream dark:bg-beefy-accent text-beefy-primary dark:text-white border border-beefy-primary/20 dark:border-transparent' : 'bg-slate-100 dark:bg-beefy-dark-border/30 text-slate-600 dark:text-beefy-dark-text-muted'
+            }`}
+          >
+            Замеры
+          </button>
         </div>
       </div>
+      {viewMode !== 'measurements' && (
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-slate-600 dark:text-beefy-dark-text-muted text-sm mr-0 w-full sm:w-auto sm:mr-2">Период:</span>
         <div className="flex flex-wrap gap-2">
@@ -232,8 +334,71 @@ export function ProgressPage() {
           </button>
         </div>
       </div>
+      )}
 
-      {chartData.length > 0 && (
+      {chartData.length > 0 && viewMode === 'measurements' && (
+        <>
+          <p className="text-slate-500 dark:text-beefy-dark-text-muted text-sm">
+            Динамика замеров по датам. Свайп по графику — прокрутка.
+          </p>
+          <div className="space-y-6">
+            {keys.map(({ id, name }) => (
+              <div
+                key={id}
+                className="bg-white dark:bg-beefy-dark-bg-card rounded-xl border border-slate-200 dark:border-beefy-dark-border p-3 sm:p-4 w-full"
+              >
+                <p className="text-slate-700 dark:text-beefy-dark-text font-medium mb-2 text-sm sm:text-base shrink-0">{name}</p>
+                <div
+                  className="overflow-x-auto overflow-y-hidden -mx-1 px-1"
+                  style={{ WebkitOverflowScrolling: 'touch' }}
+                >
+                  <div style={{ minWidth: CHART_MIN_WIDTH, height: CHART_HEIGHT }}>
+                    <LineChart
+                      width={CHART_MIN_WIDTH}
+                      height={CHART_HEIGHT}
+                      data={chartData}
+                      margin={CHART_MARGIN}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+                      <XAxis
+                        dataKey="period"
+                        tick={{ fontSize: 12, fill: chartColors.axis }}
+                        stroke={chartColors.axis}
+                        interval="preserveStartEnd"
+                      />
+                      <YAxis
+                        tick={{ fontSize: 12, fill: chartColors.axis }}
+                        stroke={chartColors.axis}
+                        width={32}
+                      />
+                      <Tooltip
+                        formatter={(value: unknown) => [
+                          value != null ? `${Number(value)} ${getMeasurementUnit(id as BodyMeasurementKey)}` : '—',
+                          name,
+                        ]}
+                        contentStyle={{ fontSize: 13, backgroundColor: chartColors.tooltipBg }}
+                        cursor={{ stroke: chartColors.cursor, strokeWidth: 1 }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey={id}
+                        name={name}
+                        stroke={COLOR_MEASUREMENTS}
+                        strokeWidth={2}
+                        dot={false}
+                        activeDot={{ r: 4 }}
+                        connectNulls
+                      />
+                    </LineChart>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {chartData.length > 0 && viewMode !== 'measurements' && (
         <>
           <p className="text-slate-500 dark:text-beefy-dark-text-muted text-sm">
             {viewMode === 'exercise'
@@ -369,7 +534,7 @@ export function ProgressPage() {
           </div>
         </>
       )}
-      {isDev && (
+      {isDev && subTab === 'charts' && viewMode !== 'measurements' && (
         <div className="pt-4 border-t border-slate-200 dark:border-beefy-dark-border">
           <button
             type="button"

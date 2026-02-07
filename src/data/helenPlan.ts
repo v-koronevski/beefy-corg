@@ -7,11 +7,11 @@ const workoutA: WorkoutTemplate = {
   name: 'Тренировка A',
   exercises: [
     { id: 'prised-smit', name: 'Присед (Смит)', sets: 5, reps: 5 },
-    { id: 'rumynskaya', name: 'Румынская тяга', sets: 5, reps: 5 },
+    { id: 'yagodichnyj-most', name: 'Ягодичный мост (с отягощением)', sets: 5, reps: 5 },
     { id: 'zhim-lezha', name: 'Жим лёжа', sets: 3, reps: 5 },
     { id: 'tyaga-vert', name: 'Тяга вертикальная (к груди)', sets: 3, reps: 5 },
     { id: 'zhim-stoya', name: 'Жим стоя', sets: 2, reps: 5 },
-    { id: 'planka', name: 'Планка', sets: 2, reps: 0, durationSec: 45 },
+    { id: 'planka', name: 'Планка', sets: 2, reps: 0, durationSec: 45, bodyweight: true },
   ],
 }
 
@@ -20,10 +20,11 @@ const workoutB: WorkoutTemplate = {
   name: 'Тренировка B',
   exercises: [
     { id: 'zhim-nogami', name: 'Жим ногами', sets: 5, reps: 5 },
+    { id: 'giperekstenziya', name: 'Гиперэкстензия', sets: 2, reps: 12 },
     { id: 'podtyagivaniya', name: 'Подтягивания / тяга к груди', sets: 3, reps: 5 },
     { id: 'zhim-naklon', name: 'Жим на наклонной скамье', sets: 3, reps: 5 },
     { id: 'tyaga-goriz', name: 'Тяга горизонтальная (к поясу)', sets: 3, reps: 5 },
-    { id: 'podem-nog', name: 'Подъём ног в висе / лёжа', sets: 2, reps: 12 },
+    { id: 'podem-nog', name: 'Подъём ног в висе / лёжа', sets: 2, reps: 12, bodyweight: true },
   ],
 }
 
@@ -36,7 +37,7 @@ const workoutC: WorkoutTemplate = {
     { id: 'zhim-lezha', name: 'Жим лёжа', sets: 3, reps: 5 },
     { id: 'tyaga-goriz', name: 'Тяга горизонтальная (к поясу)', sets: 3, reps: 5 },
     { id: 'zhim-stoya', name: 'Жим стоя', sets: 3, reps: 5 },
-    { id: 'skruchivaniya', name: 'Скручивания / велосипед', sets: 2, reps: 15 },
+    { id: 'skruchivaniya', name: 'Скручивания / велосипед', sets: 2, reps: 15, bodyweight: true },
   ],
 }
 
@@ -53,12 +54,15 @@ export const HELEN_SCHEDULE: Record<1 | 3 | 5, string> = {
   5: 'helen-c',
 }
 
-/** Все уникальные id упражнений для ввода стартовых весов */
+/** Id упражнений с собственным весом (для buildWorkoutWithWeights, если в шаблоне не задан bodyweight) */
+const BODYWEIGHT_EXERCISE_IDS = new Set(['planka', 'podem-nog', 'skruchivaniya'])
+
+/** Все уникальные id упражнений для ввода стартовых весов (без упражнений с собственным весом) */
 export function getHelenAllExerciseIds(): string[] {
   const set = new Set<string>()
   for (const w of helenPlan.workouts) {
     for (const e of w.exercises) {
-      if (e.reps > 0) set.add(e.id)
+      if (e.reps > 0 && !e.bodyweight) set.add(e.id)
     }
   }
   return Array.from(set)
@@ -77,6 +81,7 @@ export function buildWorkoutWithWeights(
     id: ex.id,
     name: ex.name,
     durationSec: ex.durationSec,
+    bodyweight: ex.bodyweight ?? BODYWEIGHT_EXERCISE_IDS.has(ex.id),
     sets: Array.from({ length: ex.sets }, () => ({
       weightKg: weights[ex.id] ?? 0,
       reps: ex.reps,
@@ -87,7 +92,9 @@ export function buildWorkoutWithWeights(
 /** Шаг добавления веса: гантели +1 кг, остальное +2.5 кг */
 const ADD_STEP_KG: Record<string, number> = {
   rumynskaya: 1,
+  'yagodichnyj-most': 2.5,
   'zhim-naklon': 1,
+  giperekstenziya: 2.5,
 }
 const DEFAULT_ADD_KG = 2.5
 const DELOAD_FACTOR = 0.9
@@ -106,17 +113,19 @@ export function getNextWeightKg(
 /** Группы мышц по упражнению (объём считается в каждую из групп) */
 const EXERCISE_MUSCLE_GROUPS: Record<string, MuscleGroupId[]> = {
   'prised-smit': ['legs'],
-  rumynskaya: ['legs', 'back'],
+  'yagodichnyj-most': ['legs'],
   'zhim-lezha': ['chest', 'arms'],
   'tyaga-vert': ['back', 'arms'],
   'zhim-stoya': ['shoulders', 'arms'],
   planka: ['core'],
   'zhim-nogami': ['legs'],
+  giperekstenziya: ['back', 'legs'],
   podtyagivaniya: ['back', 'arms'],
   'zhim-naklon': ['chest', 'arms'],
   'tyaga-goriz': ['back', 'arms'],
   'podem-nog': ['core'],
   'prised-rahma': ['legs'],
+  rumynskaya: ['legs', 'back'],
   skruchivaniya: ['core'],
 }
 

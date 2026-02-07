@@ -1,4 +1,4 @@
-import type { WorkoutPlan, WorkoutSchedule, ScheduleDay, WorkoutHistoryEntry } from '@/types'
+import type { WorkoutPlan, WorkoutSchedule, ScheduleDay, WorkoutHistoryEntry, BodyMeasurementEntry } from '@/types'
 
 const KEY_PLANS = 'workout_plans'
 const KEY_SCHEDULE = 'workout_schedule'
@@ -6,6 +6,7 @@ const KEY_WEIGHTS = 'helen_next_weights'
 const KEY_NEXT_WEIGHTS_BY_PLAN = 'workout_next_weights_by_plan'
 const KEY_ONBOARDING = 'onboarding_completed'
 const KEY_HISTORY = 'workout_history'
+const KEY_MEASUREMENTS = 'body_measurements'
 const KEY_THEME = 'app_theme'
 
 export type ThemeId = 'light' | 'dark' | 'system'
@@ -124,7 +125,37 @@ export function setWorkoutHistory(entries: WorkoutHistoryEntry[]): void {
   localStorage.setItem(KEY_HISTORY, JSON.stringify(entries))
 }
 
-/** Сброс всех данных приложения: планы, расписание, веса, онбординг, история. Тема сохраняется. */
+export function getBodyMeasurements(): BodyMeasurementEntry[] {
+  try {
+    const raw = localStorage.getItem(KEY_MEASUREMENTS)
+    if (!raw) return []
+    return JSON.parse(raw) as BodyMeasurementEntry[]
+  } catch {
+    return []
+  }
+}
+
+export function addBodyMeasurement(entry: BodyMeasurementEntry): void {
+  const list = getBodyMeasurements()
+  const existing = list.findIndex((e) => e.date === entry.date)
+  if (existing >= 0) {
+    const prev = list[existing]!
+    list[existing] = {
+      date: prev.date,
+      values: { ...prev.values, ...entry.values },
+    }
+  } else {
+    list.push(entry)
+    list.sort((a, b) => a.date.localeCompare(b.date))
+  }
+  localStorage.setItem(KEY_MEASUREMENTS, JSON.stringify(list))
+}
+
+export function setBodyMeasurements(entries: BodyMeasurementEntry[]): void {
+  localStorage.setItem(KEY_MEASUREMENTS, JSON.stringify(entries))
+}
+
+/** Сброс всех данных приложения: планы, расписание, веса, онбординг, история, замеры. Тема сохраняется. */
 export function resetAppData(): void {
   localStorage.removeItem(KEY_PLANS)
   localStorage.removeItem(KEY_SCHEDULE)
@@ -132,6 +163,7 @@ export function resetAppData(): void {
   localStorage.removeItem(KEY_NEXT_WEIGHTS_BY_PLAN)
   localStorage.removeItem(KEY_ONBOARDING)
   localStorage.removeItem(KEY_HISTORY)
+  localStorage.removeItem(KEY_MEASUREMENTS)
 }
 
 /** Локальная дата сегодня в формате YYYY-MM-DD */

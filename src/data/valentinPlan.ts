@@ -11,7 +11,7 @@ const workoutA: WorkoutTemplate = {
     { id: 'zhim-lezha', name: 'Жим лёжа', sets: 5, reps: 5 },
     { id: 'tyaga-vert-blok', name: 'Тяга вертикального блока', sets: 5, reps: 5 },
     { id: 'zhim-stoya', name: 'Жим стоя', sets: 5, reps: 5 },
-    { id: 'planka', name: 'Планка', sets: 2, reps: 0, durationSec: 45 },
+    { id: 'planka', name: 'Планка', sets: 2, reps: 0, durationSec: 45, bodyweight: true },
   ],
 }
 
@@ -23,7 +23,7 @@ const workoutB: WorkoutTemplate = {
     { id: 'tyaga-vert-blok', name: 'Тяга вертикального блока', sets: 5, reps: 5 },
     { id: 'zhim-naklon', name: 'Жим на наклонной скамье', sets: 5, reps: 5 },
     { id: 'tyaga-goriz', name: 'Тяга штанги в наклоне', sets: 5, reps: 5 },
-    { id: 'podem-nog', name: 'Подъём ног в висе / скручивания', sets: 2, reps: 12 },
+    { id: 'podem-nog', name: 'Подъём ног в висе / скручивания', sets: 2, reps: 12, bodyweight: true },
   ],
 }
 
@@ -36,7 +36,7 @@ const workoutC: WorkoutTemplate = {
     { id: 'zhim-lezha', name: 'Жим лёжа', sets: 5, reps: 5 },
     { id: 'tyaga-goriz', name: 'Тяга штанги в наклоне', sets: 5, reps: 5 },
     { id: 'zhim-stoya', name: 'Жим стоя', sets: 5, reps: 5 },
-    { id: 'skruchivaniya', name: 'Скручивания / велосипед', sets: 2, reps: 15 },
+    { id: 'skruchivaniya', name: 'Скручивания / велосипед', sets: 2, reps: 15, bodyweight: true },
   ],
 }
 
@@ -57,7 +57,7 @@ export function getValentinAllExerciseIds(): string[] {
   const set = new Set<string>()
   for (const w of valentinPlan.workouts) {
     for (const e of w.exercises) {
-      if (e.reps > 0) set.add(e.id)
+      if (e.reps > 0 && !e.bodyweight) set.add(e.id)
     }
   }
   return Array.from(set)

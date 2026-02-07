@@ -13,6 +13,8 @@ export interface ExerciseTemplate {
   reps: number
   /** Для планки/пресса: время в секундах вместо reps */
   durationSec?: number
+  /** Упражнение с собственным весом — не настраивать вес в онбординге и на экране завершения */
+  bodyweight?: boolean
 }
 
 /** Упражнение в конкретной тренировке (с весами из плана) */
@@ -22,6 +24,8 @@ export interface ExerciseInWorkout {
   sets: WorkSet[]
   /** Для пресса: время в сек */
   durationSec?: number
+  /** Упражнение с собственным весом — не показывать выбор веса на следующую тренировку */
+  bodyweight?: boolean
 }
 
 /** Одна тренировка (A, B или C) */
@@ -90,3 +94,18 @@ export type MuscleGroupId =
   | 'shoulders'
   | 'arms'
   | 'core'
+
+/** Ключи замеров тела: объёмы в см, вес в кг */
+export type BodyMeasurementKey =
+  | 'weight'    // вес тела, кг
+  | 'chest'     // грудь, см
+  | 'waist'     // талия, см
+  | 'hips'      // бёдра, см
+  | 'bicep'     // бицепс, см
+  | 'thigh'     // бедро, см
+
+/** Одна запись замеров на дату */
+export interface BodyMeasurementEntry {
+  date: string // YYYY-MM-DD
+  values: Partial<Record<BodyMeasurementKey, number>> // вес в кг, остальное в см
+}
