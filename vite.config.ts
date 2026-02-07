@@ -4,6 +4,8 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  // Для GitHub Pages: базовый путь = имя репозитория (замените на своё, если репо другое)
+  base: '/pwa-test/',
   plugins: [
     react(),
     VitePWA({
