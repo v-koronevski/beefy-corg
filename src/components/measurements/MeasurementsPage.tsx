@@ -52,7 +52,7 @@ export function MeasurementsPage() {
 
   return (
     <div className="space-y-6 w-full max-w-xl min-w-0">
-      <section className="bg-white dark:bg-beefy-dark-bg-card rounded-xl border border-beefy-primary/20 dark:border-beefy-dark-border p-4 shadow-sm">
+      <section className="bg-white dark:bg-beefy-dark-bg-card rounded-xl border border-beefy-primary/20 dark:border-beefy-dark-border p-4 shadow-sm min-w-0 overflow-hidden">
         <h2 className="text-lg font-semibold text-beefy-primary dark:text-beefy-dark-text mb-4">Добавить замер</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -61,7 +61,7 @@ export function MeasurementsPage() {
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="w-full min-h-[44px] rounded-lg border border-beefy-primary/30 dark:border-beefy-dark-border bg-white dark:bg-beefy-dark-bg text-beefy-primary dark:text-beefy-dark-text px-3 py-2"
+              className="w-full max-w-full min-h-[44px] rounded-lg border border-beefy-primary/30 dark:border-beefy-dark-border bg-white dark:bg-beefy-dark-bg text-beefy-primary dark:text-beefy-dark-text px-3 py-2 box-border"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
