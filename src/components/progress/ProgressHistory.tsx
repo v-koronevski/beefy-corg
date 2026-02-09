@@ -16,6 +16,9 @@ export function ProgressHistory() {
     entryKey: string
     exerciseIndex: number
     setIndex: number
+    currentWeight: number
+    reps: number
+    exerciseName: string
   } | null>(null)
   const [history, setHistory] = useState<WorkoutHistoryEntry[]>(() => {
     const list = getWorkoutHistory()
@@ -160,11 +163,6 @@ export function ProgressHistory() {
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {exercise.sets.map((set, idx) => {
-                            const isEditing =
-                              editingSet?.entryKey === entryKey &&
-                              editingSet?.exerciseIndex === exerciseIndex &&
-                              editingSet?.setIndex === idx
-
                             if (set.skipped) {
                               return (
                                 <span
@@ -185,19 +183,6 @@ export function ProgressHistory() {
                                 </span>
                               )
                             }
-                            if (isEditing) {
-                              return (
-                                <SetWeightEditor
-                                  key={idx}
-                                  currentWeight={set.weightKg}
-                                  reps={set.reps}
-                                  onSave={(newWeight) =>
-                                    handleUpdateSetWeight(entryKey, exerciseIndex, idx, newWeight)
-                                  }
-                                  onCancel={() => setEditingSet(null)}
-                                />
-                              )
-                            }
                             return (
                               <button
                                 key={idx}
@@ -207,6 +192,9 @@ export function ProgressHistory() {
                                     entryKey,
                                     exerciseIndex,
                                     setIndex: idx,
+                                    currentWeight: set.weightKg,
+                                    reps: set.reps,
+                                    exerciseName: exercise.name,
                                   })
                                 }
                                 className="text-xs px-2 py-1 rounded bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-200 font-medium hover:bg-emerald-200 dark:hover:bg-emerald-900/60 transition-colors cursor-pointer"
@@ -233,18 +221,31 @@ export function ProgressHistory() {
           )
         })}
       </ul>
+      {editingSet && (
+        <SetWeightModal
+          exerciseName={editingSet.exerciseName}
+          currentWeight={editingSet.currentWeight}
+          reps={editingSet.reps}
+          onSave={(newWeight) => {
+            handleUpdateSetWeight(editingSet.entryKey, editingSet.exerciseIndex, editingSet.setIndex, newWeight)
+            setEditingSet(null)
+          }}
+          onCancel={() => setEditingSet(null)}
+        />
+      )}
     </div>
   )
 }
 
-interface SetWeightEditorProps {
+interface SetWeightModalProps {
+  exerciseName: string
   currentWeight: number
   reps: number
   onSave: (newWeight: number) => void
   onCancel: () => void
 }
 
-function SetWeightEditor({ currentWeight, reps, onSave, onCancel }: SetWeightEditorProps) {
+function SetWeightModal({ exerciseName, currentWeight, reps, onSave, onCancel }: SetWeightModalProps) {
   const [weight, setWeight] = useState(String(currentWeight))
 
   const handleSave = () => {
@@ -256,42 +257,66 @@ function SetWeightEditor({ currentWeight, reps, onSave, onCancel }: SetWeightEdi
     }
   }
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      handleSave()
+    } else if (e.key === 'Escape') {
+      e.preventDefault()
+      onCancel()
+    }
+  }
+
   return (
-    <div className="inline-flex items-center gap-1 px-2 py-1 rounded bg-blue-100 dark:bg-blue-900/40 border-2 border-blue-400 dark:border-blue-600">
-      <input
-        type="number"
-        step="0.5"
-        min="0"
-        value={weight}
-        onChange={(e) => setWeight(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            handleSave()
-          } else if (e.key === 'Escape') {
-            onCancel()
-          }
-        }}
-        autoFocus
-        className="w-12 px-1 py-0.5 text-xs border border-blue-300 dark:border-blue-700 rounded bg-white dark:bg-beefy-dark-bg text-beefy-primary dark:text-beefy-dark-text focus:outline-none focus:ring-1 focus:ring-blue-500"
-      />
-      <span className="text-xs text-emerald-800 dark:text-emerald-200">кг</span>
-      <span className="text-xs text-emerald-800 dark:text-emerald-200">× {reps}</span>
-      <button
-        type="button"
-        onClick={handleSave}
-        className="ml-1 text-xs px-1.5 py-0.5 bg-blue-500 dark:bg-blue-600 text-white rounded hover:bg-blue-600 dark:hover:bg-blue-700"
-        title="Сохранить (Enter)"
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 dark:bg-black/70"
+      onClick={onCancel}
+    >
+      <div
+        className="bg-white dark:bg-beefy-dark-bg-card rounded-xl shadow-lg p-6 w-full max-w-sm border border-beefy-primary/20 dark:border-beefy-dark-border"
+        onClick={(e) => e.stopPropagation()}
       >
-        ✓
-      </button>
-      <button
-        type="button"
-        onClick={onCancel}
-        className="text-xs px-1.5 py-0.5 bg-slate-400 dark:bg-slate-600 text-white rounded hover:bg-slate-500 dark:hover:bg-slate-700"
-        title="Отмена (Esc)"
-      >
-        ×
-      </button>
+        <h3 className="text-lg font-semibold text-beefy-primary dark:text-beefy-dark-text mb-2">
+          Изменить вес
+        </h3>
+        <p className="text-sm text-beefy-text-secondary dark:text-beefy-dark-text-muted mb-4">
+          {exerciseName} — {reps} повторений
+        </p>
+        <div className="space-y-4">
+          <div>
+            <label htmlFor="weight-input" className="block text-sm font-medium text-beefy-primary dark:text-beefy-dark-text mb-2">
+              Вес (кг)
+            </label>
+            <input
+              id="weight-input"
+              type="number"
+              step="0.5"
+              min="0"
+              value={weight}
+              onChange={(e) => setWeight(e.target.value)}
+              onKeyDown={handleKeyDown}
+              autoFocus
+              className="w-full min-h-[48px] px-4 py-2 text-base border-2 border-beefy-primary/30 dark:border-beefy-dark-border rounded-lg bg-white dark:bg-beefy-dark-bg text-beefy-primary dark:text-beefy-dark-text focus:outline-none focus:ring-2 focus:ring-beefy-primary dark:focus:ring-beefy-purple focus:border-beefy-primary dark:focus:border-beefy-purple"
+            />
+          </div>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="flex-1 min-h-[48px] px-4 py-2 text-sm font-medium rounded-lg border border-beefy-primary/20 dark:border-beefy-dark-border text-beefy-primary dark:text-beefy-dark-text hover:bg-beefy-cream/50 dark:hover:bg-beefy-dark-border/30 transition-colors"
+            >
+              Отмена
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              className="flex-1 min-h-[48px] px-4 py-2 text-sm font-medium rounded-lg bg-beefy-primary dark:bg-beefy-purple text-white hover:opacity-90 active:opacity-80 transition-opacity"
+            >
+              Сохранить
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

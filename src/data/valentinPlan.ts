@@ -42,7 +42,7 @@ const workoutC: WorkoutTemplate = {
 
 export const valentinPlan: WorkoutPlan = {
   id: VALENTIN_PLAN_ID,
-  name: 'Программа Валентин',
+  name: 'Men 5x5 Workout',
   workouts: [workoutA, workoutB, workoutC],
 }
 
