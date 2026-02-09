@@ -83,7 +83,9 @@ export default function App() {
     const nextWeights = { ...currentWeights }
     for (const ex of activeWorkout.exercises) {
       if (ex.durationSec || ex.bodyweight) continue
-      const current = nextWeights[ex.id] ?? ex.sets[0]?.weightKg ?? 0
+      // Находим первый рабочий подход (не разминочный)
+      const workSet = ex.sets.find((s) => !s.isWarmup)
+      const current = nextWeights[ex.id] ?? workSet?.weightKg ?? 0
       const choice = ratings[ex.id] ?? 'same'
       nextWeights[ex.id] = getNextWeightKg(choice, current, ex.id)
     }

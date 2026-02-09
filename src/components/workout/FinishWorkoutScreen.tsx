@@ -21,7 +21,9 @@ export function FinishWorkoutScreen({
     for (const ex of exercises) {
       if (ex.durationSec || ex.bodyweight || seen.has(ex.id)) continue
       seen.add(ex.id)
-      const current = currentWeights[ex.id] ?? ex.sets[0]?.weightKg ?? 0
+      // Находим первый рабочий подход (не разминочный)
+      const workSet = ex.sets.find((s) => !s.isWarmup)
+      const current = currentWeights[ex.id] ?? workSet?.weightKg ?? 0
       list.push({
         exerciseId: ex.id,
         exerciseName: ex.name,

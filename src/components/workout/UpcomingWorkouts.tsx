@@ -99,7 +99,12 @@ export function UpcomingWorkouts({ onStartWorkout }: UpcomingWorkoutsProps) {
                     {ex.name}
                     {ex.durationSec
                       ? ` — ${ex.sets.length}×${ex.durationSec} сек`
-                      : ` — ${ex.sets.length}×${ex.sets[0]?.reps ?? 0} (${ex.sets[0]?.weightKg ?? 0} кг)`}
+                      : (() => {
+                          // Находим первый рабочий подход (не разминочный)
+                          const workSet = ex.sets.find((s) => !s.isWarmup)
+                          const workSetsCount = ex.sets.filter((s) => !s.isWarmup).length
+                          return ` — ${workSetsCount}×${workSet?.reps ?? 0} (${workSet?.weightKg ?? 0} кг)`
+                        })()}
                   </li>
                 ))}
               </ul>

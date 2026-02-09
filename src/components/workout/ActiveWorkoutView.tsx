@@ -7,8 +7,10 @@ export type ExerciseRating = 'deload' | 'same' | 'add'
 
 const REST_SECONDS_5X5 = 180
 const REST_SECONDS_OTHER = 90
+const REST_SECONDS_WARMUP = 60 // Отдых между разминочными подходами
 
-function getRestSeconds(exercise: ExerciseInWorkout): number {
+function getRestSeconds(exercise: ExerciseInWorkout, isWarmup: boolean = false): number {
+  if (isWarmup) return REST_SECONDS_WARMUP
   return exercise.sets.length >= 5 ? REST_SECONDS_5X5 : REST_SECONDS_OTHER
 }
 
@@ -78,12 +80,23 @@ export function ActiveWorkoutView({ workoutName, exercises, onComplete }: Active
 
   const finishExerciseAndMaybeRate = useCallback(() => {
     if (!exercise) return
-    if (exercise.durationSec) {
-      advanceToNext()
+    // Для упражнений с весом показываем экран выбора веса
+    if (!exercise.durationSec && !exercise.bodyweight) {
+      setRatingExerciseIndex(exerciseIndex)
       return
     }
-    setRatingExerciseIndex(exerciseIndex)
-  }, [exercise, exerciseIndex, advanceToNext])
+    // Для упражнений без веса (bodyweight/durationSec) сразу переходим к следующему
+    // Но сначала проверяем, не последнее ли это упражнение
+    const nextEx = exerciseIndex + 1
+    if (nextEx >= exercises.length) {
+      // Последнее упражнение - завершаем тренировку
+      onComplete(exerciseRatings, exerciseNotes)
+    } else {
+      // Переходим к следующему упражнению
+      setExerciseIndex(nextEx)
+      setSetIndex(0)
+    }
+  }, [exercise, exerciseIndex, exercises.length, onComplete, exerciseRatings, exerciseNotes])
 
   useEffect(() => {
     if (restSecondsLeft === null || restSecondsLeft <= 0) return
@@ -154,11 +167,11 @@ export function ActiveWorkoutView({ workoutName, exercises, onComplete }: Active
       finishExerciseAndMaybeRate()
       return
     }
-    // Для разминочных подходов отдых короче или отсутствует
+    // Для разминочных подходов короткий отдых
     const isWarmupSet = workSet?.isWarmup
     if (isWarmupSet) {
-      // Переходим сразу к следующему подходу без отдыха
-      advanceToNext()
+      setRestTotal(getRestSeconds(exercise, true))
+      setRestSecondsLeft(getRestSeconds(exercise, true))
       return
     }
     setRestTotal(getRestSeconds(exercise))
@@ -219,21 +232,16 @@ export function ActiveWorkoutView({ workoutName, exercises, onComplete }: Active
   const handleRating = (choice: ExerciseRating) => {
     if (ratingExercise == null) return
     setExerciseRatings((prev) => ({ ...prev, [ratingExercise.id]: choice }))
-    // Находим все упражнения, которые требуют выбора веса
-    const exercisesNeedingRating = exercises
-      .map((ex, idx) => ({ ex, idx }))
-      .filter(({ ex }) => !ex.durationSec && !ex.bodyweight)
-    const lastRatingExercise = exercisesNeedingRating.length > 0 
-      ? exercisesNeedingRating[exercisesNeedingRating.length - 1]
-      : null
-    const isLastRatingExercise = lastRatingExercise?.idx === exerciseIndex
     
-    if (isLastRatingExercise) {
-      // Последнее упражнение с выбором веса - завершаем тренировку с заметками
+    // Проверяем, не последнее ли это упражнение в тренировке
+    const nextEx = exerciseIndex + 1
+    if (nextEx >= exercises.length) {
+      // Последнее упражнение - завершаем тренировку с заметками
       onComplete({ ...exerciseRatings, [ratingExercise.id]: choice }, exerciseNotes)
     } else {
+      // Переходим к следующему упражнению
       setRatingExerciseIndex(null)
-      setExerciseIndex(exerciseIndex + 1)
+      setExerciseIndex(nextEx)
       setSetIndex(0)
     }
   }
@@ -242,7 +250,9 @@ export function ActiveWorkoutView({ workoutName, exercises, onComplete }: Active
   const shouldRecommendIncrease = useMemo(() => {
     if (!ratingExercise) return false
     
-    const currentKg = ratingExercise.sets[0]?.weightKg ?? 0
+    // Находим первый рабочий подход (не разминочный)
+    const workSet = ratingExercise.sets.find((s) => !s.isWarmup)
+    const currentKg = workSet?.weightKg ?? 0
     if (currentKg === 0) return false // Не показываем для упражнений без веса
     
     const history = getWorkoutHistory()
@@ -285,15 +295,9 @@ export function ActiveWorkoutView({ workoutName, exercises, onComplete }: Active
   }, [ratingExercise])
 
   if (ratingExercise != null) {
-    const currentKg = ratingExercise.sets[0]?.weightKg ?? 0
-    // Находим все упражнения, которые требуют выбора веса (не bodyweight и не durationSec)
-    const exercisesNeedingRating = exercises
-      .map((ex, idx) => ({ ex, idx }))
-      .filter(({ ex }) => !ex.durationSec && !ex.bodyweight)
-    const lastRatingExercise = exercisesNeedingRating.length > 0 
-      ? exercisesNeedingRating[exercisesNeedingRating.length - 1]
-      : null
-    const isLastRatingExercise = lastRatingExercise?.idx === exerciseIndex
+    // Находим первый рабочий подход (не разминочный)
+    const workSet = ratingExercise.sets.find((s) => !s.isWarmup)
+    const currentKg = workSet?.weightKg ?? 0
     return (
       <div className="space-y-6 w-full min-w-0 max-w-full">
         <p className="text-slate-500 dark:text-beefy-dark-text-muted text-sm">{workoutName}</p>
@@ -339,26 +343,25 @@ export function ActiveWorkoutView({ workoutName, exercises, onComplete }: Active
               )
             })}
           </div>
-          {isLastRatingExercise && (
-            <div className="mt-6 pt-6 border-t border-slate-200 dark:border-beefy-dark-border">
-              <label htmlFor={`exercise-notes-${ratingExercise.id}`} className="block text-sm font-semibold text-slate-800 dark:text-beefy-dark-text mb-2">
-                📝 Заметки к упражнению (необязательно)
-              </label>
-              <textarea
-                id={`exercise-notes-${ratingExercise.id}`}
-                value={exerciseNotes[ratingExercise.id] || ''}
-                onChange={(e) => setExerciseNotes((prev) => ({ ...prev, [ratingExercise.id]: e.target.value }))}
-                placeholder="Как прошло упражнение? Что заметил? Что можно улучшить?"
-                rows={3}
-                className="w-full px-4 py-3 text-sm border-2 border-slate-300 dark:border-beefy-dark-border rounded-xl bg-white dark:bg-beefy-dark-bg text-slate-800 dark:text-beefy-dark-text placeholder:text-slate-400 dark:placeholder:text-beefy-dark-text-muted focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-400 focus:border-emerald-500 dark:focus:border-emerald-400 resize-none"
-              />
-              {(exerciseNotes[ratingExercise.id]?.trim()) && (
-                <p className="text-xs text-slate-500 dark:text-beefy-dark-text-muted mt-1">
-                  Заметки будут сохранены вместе с упражнением
-                </p>
-              )}
-            </div>
-          )}
+          {/* Заметки показываются для каждого упражнения */}
+          <div className="mt-6 pt-6 border-t border-slate-200 dark:border-beefy-dark-border">
+            <label htmlFor={`exercise-notes-${ratingExercise.id}`} className="block text-sm font-semibold text-slate-800 dark:text-beefy-dark-text mb-2">
+              📝 Заметки к упражнению (необязательно)
+            </label>
+            <textarea
+              id={`exercise-notes-${ratingExercise.id}`}
+              value={exerciseNotes[ratingExercise.id] || ''}
+              onChange={(e) => setExerciseNotes((prev) => ({ ...prev, [ratingExercise.id]: e.target.value }))}
+              placeholder="Как прошло упражнение? Что заметил? Что можно улучшить?"
+              rows={3}
+              className="w-full px-4 py-3 text-sm border-2 border-slate-300 dark:border-beefy-dark-border rounded-xl bg-white dark:bg-beefy-dark-bg text-slate-800 dark:text-beefy-dark-text placeholder:text-slate-400 dark:placeholder:text-beefy-dark-text-muted focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-400 focus:border-emerald-500 dark:focus:border-emerald-400 resize-none"
+            />
+            {(exerciseNotes[ratingExercise.id]?.trim()) && (
+              <p className="text-xs text-slate-500 dark:text-beefy-dark-text-muted mt-1">
+                Заметки будут сохранены вместе с упражнением
+              </p>
+            )}
+          </div>
         </div>
       </div>
     )
