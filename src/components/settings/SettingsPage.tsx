@@ -1,6 +1,7 @@
 import { useTheme } from '@/hooks/useTheme'
-import { resetAppData } from '@/utils/storage'
+import { resetAppData, resetProgram } from '@/utils/storage'
 import type { ThemeId } from '@/utils/storage'
+import { ExerciseSettingsEditor } from './ExerciseSettingsEditor'
 
 const THEMES: { id: ThemeId; label: string }[] = [
   { id: 'light', label: 'Светлая' },
@@ -11,8 +12,24 @@ const THEMES: { id: ThemeId; label: string }[] = [
 export function SettingsPage() {
   const { theme, setTheme } = useTheme()
 
-  const handleReset = () => {
-    if (!window.confirm('Сбросить все данные? Будут удалены планы, расписание, веса и история тренировок. Приложение откроется заново для настройки.')) {
+  const handleResetProgram = () => {
+    if (
+      !window.confirm(
+        'Сбросить программу тренировок? Будут удалены планы, расписание, веса и настройки упражнений. История тренировок и замеры сохранятся. Приложение откроется заново для настройки.'
+      )
+    ) {
+      return
+    }
+    resetProgram()
+    window.location.reload()
+  }
+
+  const handleResetAll = () => {
+    if (
+      !window.confirm(
+        'Сбросить ВСЕ данные? Будут удалены планы, расписание, веса, история тренировок и замеры. Приложение откроется заново для настройки.'
+      )
+    ) {
       return
     }
     resetAppData()
@@ -42,17 +59,37 @@ export function SettingsPage() {
         </div>
       </section>
       <section className="bg-white dark:bg-beefy-dark-bg-card rounded-xl border border-beefy-primary/20 dark:border-beefy-dark-border p-4 shadow-sm">
+        <h3 className="text-beefy-primary dark:text-beefy-dark-text font-medium mb-3">Тренировки</h3>
+        <ExerciseSettingsEditor />
+      </section>
+      <section className="bg-white dark:bg-beefy-dark-bg-card rounded-xl border border-beefy-primary/20 dark:border-beefy-dark-border p-4 shadow-sm">
         <h3 className="text-beefy-primary dark:text-beefy-dark-text font-medium mb-3">Данные</h3>
-        <p className="text-beefy-text-secondary dark:text-beefy-dark-text-muted text-sm mb-4">
-          Сброс удалит расписание, веса и историю тренировок. После сброса снова откроется экран начальной настройки.
-        </p>
-        <button
-          type="button"
-          onClick={handleReset}
-          className="min-h-[44px] px-4 py-2.5 rounded-xl text-sm font-medium touch-manipulation bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200 border border-red-300 dark:border-red-700 hover:bg-red-200 dark:hover:bg-red-900/60"
-        >
-          Сбросить данные
-        </button>
+        <div className="space-y-4">
+          <div>
+            <p className="text-beefy-text-secondary dark:text-beefy-dark-text-muted text-sm mb-2">
+              Сбросить только программу тренировок. История тренировок и замеры сохранятся.
+            </p>
+            <button
+              type="button"
+              onClick={handleResetProgram}
+              className="min-h-[44px] px-4 py-2.5 rounded-xl text-sm font-medium touch-manipulation bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-700 hover:bg-amber-200 dark:hover:bg-amber-900/60 w-full sm:w-auto"
+            >
+              Сбросить программу
+            </button>
+          </div>
+          <div className="pt-3 border-t border-beefy-primary/10 dark:border-beefy-dark-border">
+            <p className="text-beefy-text-secondary dark:text-beefy-dark-text-muted text-sm mb-2">
+              Сбросить все данные, включая историю тренировок и замеры.
+            </p>
+            <button
+              type="button"
+              onClick={handleResetAll}
+              className="min-h-[44px] px-4 py-2.5 rounded-xl text-sm font-medium touch-manipulation bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200 border border-red-300 dark:border-red-700 hover:bg-red-200 dark:hover:bg-red-900/60 w-full sm:w-auto"
+            >
+              Сбросить все данные
+            </button>
+          </div>
+        </div>
       </section>
     </div>
   )

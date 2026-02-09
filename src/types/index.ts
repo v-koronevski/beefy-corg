@@ -3,6 +3,7 @@ export interface WorkSet {
   weightKg: number
   reps: number
   skipped?: boolean
+  durationSec?: number
 }
 
 /** Упражнение в шаблоне тренировки */
@@ -83,6 +84,7 @@ export interface WorkoutHistoryEntry {
     id: string
     name: string
     sets: { weightKg: number; reps: number; skipped?: boolean; durationSec?: number }[]
+    notes?: string
   }[]
 }
 
@@ -108,4 +110,18 @@ export type BodyMeasurementKey =
 export interface BodyMeasurementEntry {
   date: string // YYYY-MM-DD
   values: Partial<Record<BodyMeasurementKey, number>> // вес в кг, остальное в см
+}
+
+/** Настройки упражнения: шаг изменения веса, подходы, повторения */
+export interface ExerciseSettings {
+  /** Шаг увеличения веса при выборе "добавить" (кг) */
+  addStepKg?: number
+  /** Шаг уменьшения веса при выборе "понизить" (кг), если не задан - используется 10% */
+  deloadStepKg?: number
+  /** Количество подходов (переопределяет значение из плана) */
+  sets?: number
+  /** Количество повторений (переопределяет значение из плана) */
+  reps?: number
+  /** Время в секундах для упражнений на время (переопределяет значение из плана) */
+  durationSec?: number
 }

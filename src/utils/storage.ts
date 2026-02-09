@@ -1,4 +1,4 @@
-import type { WorkoutPlan, WorkoutSchedule, ScheduleDay, WorkoutHistoryEntry, BodyMeasurementEntry } from '@/types'
+import type { WorkoutPlan, WorkoutSchedule, ScheduleDay, WorkoutHistoryEntry, BodyMeasurementEntry, ExerciseSettings } from '@/types'
 
 const KEY_PLANS = 'workout_plans'
 const KEY_SCHEDULE = 'workout_schedule'
@@ -8,6 +8,7 @@ const KEY_ONBOARDING = 'onboarding_completed'
 const KEY_HISTORY = 'workout_history'
 const KEY_MEASUREMENTS = 'body_measurements'
 const KEY_THEME = 'app_theme'
+const KEY_EXERCISE_SETTINGS = 'exercise_settings'
 
 export type ThemeId = 'light' | 'dark' | 'system'
 
@@ -155,13 +156,19 @@ export function setBodyMeasurements(entries: BodyMeasurementEntry[]): void {
   localStorage.setItem(KEY_MEASUREMENTS, JSON.stringify(entries))
 }
 
-/** Сброс всех данных приложения: планы, расписание, веса, онбординг, история, замеры. Тема сохраняется. */
-export function resetAppData(): void {
+/** Сброс только программы: планы, расписание, веса, онбординг, настройки упражнений. История и замеры сохраняются. */
+export function resetProgram(): void {
   localStorage.removeItem(KEY_PLANS)
   localStorage.removeItem(KEY_SCHEDULE)
   localStorage.removeItem(KEY_WEIGHTS)
   localStorage.removeItem(KEY_NEXT_WEIGHTS_BY_PLAN)
   localStorage.removeItem(KEY_ONBOARDING)
+  localStorage.removeItem(KEY_EXERCISE_SETTINGS)
+}
+
+/** Сброс всех данных приложения: планы, расписание, веса, онбординг, история, замеры. Тема сохраняется. */
+export function resetAppData(): void {
+  resetProgram()
   localStorage.removeItem(KEY_HISTORY)
   localStorage.removeItem(KEY_MEASUREMENTS)
 }
@@ -208,4 +215,34 @@ export function getUpcomingScheduleDates(
     }
   }
   return result
+}
+
+/** Настройки упражнений: exerciseId → ExerciseSettings */
+export function getExerciseSettings(): Record<string, ExerciseSettings> {
+  try {
+    const raw = localStorage.getItem(KEY_EXERCISE_SETTINGS)
+    if (!raw) return {}
+    return JSON.parse(raw) as Record<string, ExerciseSettings>
+  } catch {
+    return {}
+  }
+}
+
+export function setExerciseSettings(settings: Record<string, ExerciseSettings>): void {
+  localStorage.setItem(KEY_EXERCISE_SETTINGS, JSON.stringify(settings))
+}
+
+export function getExerciseSetting(exerciseId: string): ExerciseSettings | null {
+  const all = getExerciseSettings()
+  return all[exerciseId] || null
+}
+
+export function setExerciseSetting(exerciseId: string, setting: ExerciseSettings | null): void {
+  const all = getExerciseSettings()
+  if (setting === null) {
+    delete all[exerciseId]
+  } else {
+    all[exerciseId] = setting
+  }
+  setExerciseSettings(all)
 }

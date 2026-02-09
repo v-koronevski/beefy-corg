@@ -70,7 +70,7 @@ export default function App() {
     })
   }, [])
 
-  const handleWorkoutComplete = useCallback((ratings: Record<string, ExerciseRating>) => {
+  const handleWorkoutComplete = useCallback((ratings: Record<string, ExerciseRating>, exerciseNotes: Record<string, string>) => {
     if (!activeWorkout || !schedule) return
     const planId = schedule.planId
     const currentWeights = getNextWeights(planId)
@@ -89,11 +89,18 @@ export default function App() {
       exercises: activeWorkout.exercises.map((ex) => ({
         id: ex.id,
         name: ex.name,
-        sets: ex.sets.map((s) => ({
-          weightKg: s.weightKg,
-          reps: s.reps,
-          skipped: s.skipped,
-        })),
+        sets: ex.sets.map((s) => {
+          const set: { weightKg: number; reps: number; skipped?: boolean; durationSec?: number } = {
+            weightKg: s.weightKg,
+            reps: s.reps,
+            skipped: s.skipped,
+          }
+          if (ex.durationSec) {
+            set.durationSec = ex.durationSec
+          }
+          return set
+        }),
+        notes: exerciseNotes[ex.id]?.trim() || undefined,
       })),
     })
     setActiveWorkout(null)

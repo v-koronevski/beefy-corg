@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { getNextWeightKg } from '@/data/helenPlan'
+import { getWorkoutHistory } from '@/utils/storage'
 import type { ExerciseInWorkout } from '@/types'
 
 export type ExerciseRating = 'deload' | 'same' | 'add'
@@ -14,7 +15,7 @@ function getRestSeconds(exercise: ExerciseInWorkout): number {
 export interface ActiveWorkoutViewProps {
   workoutName: string
   exercises: ExerciseInWorkout[]
-  onComplete: (ratings: Record<string, ExerciseRating>) => void
+  onComplete: (ratings: Record<string, ExerciseRating>, exerciseNotes: Record<string, string>) => void
 }
 
 export function ActiveWorkoutView({ workoutName, exercises, onComplete }: ActiveWorkoutViewProps) {
@@ -27,6 +28,7 @@ export function ActiveWorkoutView({ workoutName, exercises, onComplete }: Active
   const [exerciseTimerSeconds, setExerciseTimerSeconds] = useState<number | null>(null)
   const [editingReps, setEditingReps] = useState<{ exerciseIndex: number; setIndex: number } | null>(null)
   const [tempRepsValue, setTempRepsValue] = useState('')
+  const [exerciseNotes, setExerciseNotes] = useState<Record<string, string>>({})
 
   const exercise = exercises[exerciseIndex]
   const workSet = exercise?.sets[setIndex]
@@ -183,22 +185,90 @@ export function ActiveWorkoutView({ workoutName, exercises, onComplete }: Active
   const handleRating = (choice: ExerciseRating) => {
     if (ratingExercise == null) return
     setExerciseRatings((prev) => ({ ...prev, [ratingExercise.id]: choice }))
-    setRatingExerciseIndex(null)
-    if (exerciseIndex + 1 < exercises.length) {
+    // Находим все упражнения, которые требуют выбора веса
+    const exercisesNeedingRating = exercises
+      .map((ex, idx) => ({ ex, idx }))
+      .filter(({ ex }) => !ex.durationSec && !ex.bodyweight)
+    const isLastRatingExercise = exercisesNeedingRating.length > 0 && 
+      exercisesNeedingRating[exercisesNeedingRating.length - 1].idx === exerciseIndex
+    
+    if (isLastRatingExercise) {
+      // Последнее упражнение с выбором веса - завершаем тренировку с заметками
+      onComplete({ ...exerciseRatings, [ratingExercise.id]: choice }, exerciseNotes)
+    } else {
+      setRatingExerciseIndex(null)
       setExerciseIndex(exerciseIndex + 1)
       setSetIndex(0)
-    } else {
-      onComplete({ ...exerciseRatings, [ratingExercise.id]: choice })
     }
   }
 
+  // Проверяем, нужно ли рекомендовать повышение веса
+  const shouldRecommendIncrease = useMemo(() => {
+    if (!ratingExercise) return false
+    
+    const currentKg = ratingExercise.sets[0]?.weightKg ?? 0
+    if (currentKg === 0) return false // Не показываем для упражнений без веса
+    
+    const history = getWorkoutHistory()
+    // Сортируем по дате (новые сначала)
+    const sorted = [...history].sort((a, b) => b.date.localeCompare(a.date))
+    
+    // Находим последние две тренировки с этим упражнением
+    const lastTwoWeights: number[] = []
+    for (const entry of sorted) {
+      const exercise = entry.exercises.find((e) => e.id === ratingExercise.id)
+      if (!exercise) continue
+      
+      // Находим максимальный вес из выполненных подходов
+      let maxWeight = 0
+      let hasCompletedSets = false
+      for (const set of exercise.sets) {
+        if (set.skipped) continue
+        hasCompletedSets = true
+        if (set.weightKg > 0) {
+          maxWeight = Math.max(maxWeight, set.weightKg)
+        }
+      }
+      
+      // Если есть выполненные подходы с весом
+      if (hasCompletedSets && maxWeight > 0) {
+        lastTwoWeights.push(maxWeight)
+        if (lastTwoWeights.length >= 2) break
+      }
+    }
+    
+    // Если есть две тренировки с одинаковым весом, и текущий вес такой же
+    // Рекомендуем повышение
+    if (lastTwoWeights.length === 2 && 
+        lastTwoWeights[0] === lastTwoWeights[1] && 
+        currentKg === lastTwoWeights[0]) {
+      return true
+    }
+    
+    return false
+  }, [ratingExercise])
+
   if (ratingExercise != null) {
     const currentKg = ratingExercise.sets[0]?.weightKg ?? 0
+    // Находим все упражнения, которые требуют выбора веса (не bodyweight и не durationSec)
+    const exercisesNeedingRating = exercises
+      .map((ex, idx) => ({ ex, idx }))
+      .filter(({ ex }) => !ex.durationSec && !ex.bodyweight)
+    const isLastRatingExercise = exercisesNeedingRating.length > 0 && 
+      exercisesNeedingRating[exercisesNeedingRating.length - 1].idx === exerciseIndex
     return (
       <div className="space-y-6 w-full min-w-0 max-w-full">
         <p className="text-slate-500 dark:text-beefy-dark-text-muted text-sm">{workoutName}</p>
         <div className="bg-white dark:bg-beefy-dark-bg-card rounded-xl border border-slate-200 dark:border-beefy-dark-border p-4 sm:p-6 shadow-sm w-full">
           <h3 className="text-lg sm:text-xl font-semibold text-slate-800 dark:text-beefy-dark-text mb-2">{ratingExercise.name}</h3>
+          {shouldRecommendIncrease && (
+            <div className="mb-4 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800">
+              <p className="text-sm font-medium text-blue-800 dark:text-blue-200 flex items-center gap-2">
+                <span>💡</span>
+                <span>Рекомендация: вы тренировались с весом {currentKg} кг уже две тренировки подряд. Рекомендуется повысить вес.</span>
+              </p>
+            </div>
+          )}
           <p className="text-slate-600 dark:text-beefy-dark-text-muted text-sm mb-4">
             План на следующую тренировку:
           </p>
@@ -207,23 +277,47 @@ export function ActiveWorkoutView({ workoutName, exercises, onComplete }: Active
               const nextKg = getNextWeightKg(choice, currentKg, ratingExercise.id)
               const label =
                 choice === 'deload' ? `Понизить вес → ${nextKg} кг` : choice === 'same' ? `Оставить → ${currentKg} кг` : `Добавить вес → ${nextKg} кг`
+              const isRecommended = shouldRecommendIncrease && choice === 'add'
               return (
                 <button
                   key={choice}
                   type="button"
                   onClick={() => handleRating(choice)}
-                  className={`min-h-[48px] px-4 py-3 sm:py-2.5 rounded-xl text-sm font-medium touch-manipulation w-full sm:w-auto ${
+                  className={`min-h-[48px] px-4 py-3 sm:py-2.5 rounded-xl text-sm font-medium touch-manipulation w-full sm:w-auto relative ${
                     choice === 'deload'
                       ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-700'
                       : choice === 'add'
-                        ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700'
+                        ? isRecommended
+                          ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 border-2 border-blue-400 dark:border-blue-600 shadow-md'
+                          : 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700'
                         : 'bg-slate-100 dark:bg-beefy-dark-border/30 text-slate-800 dark:text-beefy-dark-text border border-slate-300 dark:border-beefy-dark-border'
                   }`}
                 >
+                  {isRecommended && (
+                    <span className="absolute -top-1 -right-1 text-xs">⭐</span>
+                  )}
                   {label}
                 </button>
               )
             })}
+          </div>
+          <div className="mt-6 pt-6 border-t border-slate-200 dark:border-beefy-dark-border">
+            <label htmlFor={`exercise-notes-${ratingExercise.id}`} className="block text-sm font-semibold text-slate-800 dark:text-beefy-dark-text mb-2">
+              📝 Заметки к упражнению (необязательно)
+            </label>
+            <textarea
+              id={`exercise-notes-${ratingExercise.id}`}
+              value={exerciseNotes[ratingExercise.id] || ''}
+              onChange={(e) => setExerciseNotes((prev) => ({ ...prev, [ratingExercise.id]: e.target.value }))}
+              placeholder="Как прошло упражнение? Что заметил? Что можно улучшить?"
+              rows={3}
+              className="w-full px-4 py-3 text-sm border-2 border-slate-300 dark:border-beefy-dark-border rounded-xl bg-white dark:bg-beefy-dark-bg text-slate-800 dark:text-beefy-dark-text placeholder:text-slate-400 dark:placeholder:text-beefy-dark-text-muted focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-400 focus:border-emerald-500 dark:focus:border-emerald-400 resize-none"
+            />
+            {(exerciseNotes[ratingExercise.id]?.trim()) && (
+              <p className="text-xs text-slate-500 dark:text-beefy-dark-text-muted mt-1">
+                Заметки будут сохранены вместе с упражнением
+              </p>
+            )}
           </div>
         </div>
       </div>

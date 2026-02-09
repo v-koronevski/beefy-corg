@@ -1,4 +1,5 @@
-import type { ExerciseInWorkout, WorkoutTemplate, WorkoutPlan, MuscleGroupId } from '@/types'
+import type { ExerciseInWorkout, WorkoutTemplate, WorkoutPlan, MuscleGroupId, ExerciseSettings } from '@/types'
+import { getExerciseSettings, getExerciseSetting } from '@/utils/storage'
 
 export const HELEN_PLAN_ID = 'helen-fullbody'
 
@@ -77,16 +78,31 @@ export function buildWorkoutWithWeights(
   workout: WorkoutTemplate,
   weights: Record<string, number>
 ): ExerciseInWorkout[] {
-  return workout.exercises.map((ex) => ({
-    id: ex.id,
-    name: ex.name,
-    durationSec: ex.durationSec,
-    bodyweight: ex.bodyweight ?? BODYWEIGHT_EXERCISE_IDS.has(ex.id),
-    sets: Array.from({ length: ex.sets }, () => ({
-      weightKg: weights[ex.id] ?? 0,
-      reps: ex.reps,
-    })),
-  }))
+  // Загружаем настройки упражнений
+  let exerciseSettings: Record<string, ExerciseSettings> = {}
+  try {
+    exerciseSettings = getExerciseSettings()
+  } catch {
+    // Если не удалось загрузить настройки, используем значения по умолчанию
+  }
+  
+  return workout.exercises.map((ex) => {
+    const settings = exerciseSettings[ex.id]
+    const sets = settings?.sets ?? ex.sets
+    const reps = settings?.reps ?? ex.reps
+    const durationSec = settings?.durationSec ?? ex.durationSec
+    
+    return {
+      id: ex.id,
+      name: ex.name,
+      durationSec,
+      bodyweight: ex.bodyweight ?? BODYWEIGHT_EXERCISE_IDS.has(ex.id),
+      sets: Array.from({ length: sets }, () => ({
+        weightKg: weights[ex.id] ?? 0,
+        reps,
+      })),
+    }
+  })
 }
 
 /** Шаг добавления веса: гантели +1 кг, остальное +2.5 кг */
@@ -105,9 +121,29 @@ export function getNextWeightKg(
   exerciseId: string
 ): number {
   if (choice === 'same') return currentKg
-  if (choice === 'deload') return Math.max(0, Math.round(currentKg * DELOAD_FACTOR * 2) / 2)
-  const step = ADD_STEP_KG[exerciseId] ?? DEFAULT_ADD_KG
-  return Math.round((currentKg + step) * 2) / 2
+  
+  // Загружаем настройки упражнения
+  let addStep = ADD_STEP_KG[exerciseId] ?? DEFAULT_ADD_KG
+  let deloadStep: number | null = null
+  
+  try {
+    const settings = getExerciseSetting(exerciseId)
+    if (settings) {
+      if (settings.addStepKg !== undefined) addStep = settings.addStepKg
+      if (settings.deloadStepKg !== undefined) deloadStep = settings.deloadStepKg
+    }
+  } catch {
+    // Если не удалось загрузить настройки, используем значения по умолчанию
+  }
+  
+  if (choice === 'deload') {
+    if (deloadStep !== null) {
+      return Math.max(0, Math.round((currentKg - deloadStep) * 2) / 2)
+    }
+    return Math.max(0, Math.round(currentKg * DELOAD_FACTOR * 2) / 2)
+  }
+  
+  return Math.round((currentKg + addStep) * 2) / 2
 }
 
 /** Группы мышц по упражнению (объём считается в каждую из групп) */
