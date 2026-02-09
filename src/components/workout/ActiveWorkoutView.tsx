@@ -24,6 +24,9 @@ export function ActiveWorkoutView({ workoutName, exercises, onComplete }: Active
   const [restTotal, setRestTotal] = useState<number | null>(null)
   const [exerciseRatings, setExerciseRatings] = useState<Record<string, ExerciseRating>>({})
   const [ratingExerciseIndex, setRatingExerciseIndex] = useState<number | null>(null)
+  const [exerciseTimerSeconds, setExerciseTimerSeconds] = useState<number | null>(null)
+  const [editingReps, setEditingReps] = useState<{ exerciseIndex: number; setIndex: number } | null>(null)
+  const [tempRepsValue, setTempRepsValue] = useState('')
 
   const exercise = exercises[exerciseIndex]
   const workSet = exercise?.sets[setIndex]
@@ -32,6 +35,8 @@ export function ActiveWorkoutView({ workoutName, exercises, onComplete }: Active
 
   const advanceToNext = useCallback(() => {
     if (!exercise) return
+    // Сбрасываем таймер упражнения при переходе
+    setExerciseTimerSeconds(null)
     const nextSet = setIndex + 1
     if (nextSet < exercise.sets.length) {
       setSetIndex(nextSet)
@@ -70,8 +75,55 @@ export function ActiveWorkoutView({ workoutName, exercises, onComplete }: Active
     return () => clearInterval(t)
   }, [restSecondsLeft, advanceToNext])
 
+  // Сбрасываем таймер при смене упражнения или подхода
+  useEffect(() => {
+    setExerciseTimerSeconds(null)
+  }, [exerciseIndex, setIndex])
+
+  // Таймер для упражнений на время
+  useEffect(() => {
+    if (exerciseTimerSeconds === null || exerciseTimerSeconds <= 0) {
+      if (exerciseTimerSeconds === 0 && exercise?.durationSec) {
+        // Таймер закончился - переходим на отдых
+        const isLastSet = setIndex + 1 >= exercise.sets.length
+        if (isLastSet) {
+          finishExerciseAndMaybeRate()
+        } else {
+          setRestTotal(getRestSeconds(exercise))
+          setRestSecondsLeft(getRestSeconds(exercise))
+        }
+        setExerciseTimerSeconds(null)
+      }
+      return
+    }
+    const t = setInterval(() => {
+      setExerciseTimerSeconds((s) => {
+        if (s === null || s <= 1) {
+          clearInterval(t)
+          return 0
+        }
+        return s - 1
+      })
+    }, 1000)
+    return () => clearInterval(t)
+  }, [exerciseTimerSeconds, exercise, setIndex, finishExerciseAndMaybeRate])
+
+  const handleStartExerciseTimer = () => {
+    if (!exercise?.durationSec) return
+    setExerciseTimerSeconds(exercise.durationSec)
+  }
+
   const handleCompleteSet = () => {
     if (!exercise) return
+    // Если упражнение на время и таймер не запущен - запускаем таймер
+    if (exercise.durationSec && exerciseTimerSeconds === null) {
+      handleStartExerciseTimer()
+      return
+    }
+    // Если таймер запущен - останавливаем и завершаем подход
+    if (exerciseTimerSeconds !== null) {
+      setExerciseTimerSeconds(null)
+    }
     const isLastSet = setIndex + 1 >= exercise.sets.length
     if (isLastSet) {
       finishExerciseAndMaybeRate()
@@ -98,11 +150,34 @@ export function ActiveWorkoutView({ workoutName, exercises, onComplete }: Active
 
   const setLabel = `Подход ${setIndex + 1} из ${exercise.sets.length}`
   const isDurationSet = !!exercise.durationSec
+  const isExerciseTimerRunning = exerciseTimerSeconds !== null && exerciseTimerSeconds > 0
 
   const handleStartEarly = () => {
     setRestSecondsLeft(null)
     setRestTotal(null)
     advanceToNext()
+  }
+
+  const handleEditReps = () => {
+    if (!exercise || workSet === undefined) return
+    setTempRepsValue(String(workSet.reps))
+    setEditingReps({ exerciseIndex, setIndex })
+  }
+
+  const handleSaveReps = (newReps: number) => {
+    if (!editingReps || newReps < 0) return
+    const ex = exercises[editingReps.exerciseIndex]
+    const set = ex?.sets[editingReps.setIndex]
+    if (set) {
+      set.reps = Math.max(0, Math.floor(newReps))
+    }
+    setEditingReps(null)
+    setTempRepsValue('')
+  }
+
+  const handleCancelEditReps = () => {
+    setEditingReps(null)
+    setTempRepsValue('')
   }
 
   const handleRating = (choice: ExerciseRating) => {
@@ -209,6 +284,59 @@ export function ActiveWorkoutView({ workoutName, exercises, onComplete }: Active
     )
   }
 
+  // Модальное окно редактирования повторений
+  if (editingReps) {
+    const editingExercise = exercises[editingReps.exerciseIndex]
+    return (
+      <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center p-4 z-50">
+        <div className="bg-white dark:bg-beefy-dark-bg-card rounded-xl border border-slate-200 dark:border-beefy-dark-border p-6 shadow-lg max-w-sm w-full">
+          <h3 className="text-lg font-semibold text-slate-800 dark:text-beefy-dark-text mb-2">
+            Изменить количество повторений
+          </h3>
+          <p className="text-sm text-slate-600 dark:text-beefy-dark-text-muted mb-4">
+            {editingExercise?.name} — подход {editingReps.setIndex + 1}
+          </p>
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-slate-700 dark:text-beefy-dark-text mb-2">
+              Повторений:
+            </label>
+            <input
+              type="number"
+              min="0"
+              value={tempRepsValue}
+              onChange={(e) => setTempRepsValue(e.target.value)}
+              className="w-full px-4 py-3 text-lg border border-slate-300 dark:border-beefy-dark-border rounded-xl bg-white dark:bg-beefy-dark-bg text-slate-800 dark:text-beefy-dark-text focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-400"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleSaveReps(Number(tempRepsValue))
+                } else if (e.key === 'Escape') {
+                  handleCancelEditReps()
+                }
+              }}
+            />
+          </div>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={handleCancelEditReps}
+              className="flex-1 min-h-[48px] py-3 border border-slate-300 dark:border-beefy-dark-border text-slate-600 dark:text-beefy-dark-text-muted rounded-xl hover:bg-slate-100 dark:hover:bg-beefy-dark-border/30 font-medium touch-manipulation"
+            >
+              Отмена
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSaveReps(Number(tempRepsValue))}
+              className="flex-1 min-h-[48px] py-3 bg-emerald-600 dark:bg-emerald-500 text-white font-semibold rounded-xl hover:bg-emerald-500 dark:hover:bg-emerald-400 active:bg-emerald-700 dark:active:bg-emerald-600 touch-manipulation"
+            >
+              Сохранить
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6 w-full max-w-xl min-w-0">
       <p className="text-slate-500 dark:text-beefy-dark-text-muted text-sm">{workoutName}</p>
@@ -216,13 +344,35 @@ export function ActiveWorkoutView({ workoutName, exercises, onComplete }: Active
         <p className="text-slate-500 dark:text-beefy-dark-text-muted text-sm mb-1">{setLabel}</p>
         <h3 className="text-lg sm:text-xl font-semibold text-slate-800 dark:text-beefy-dark-text mb-2">{exercise.name}</h3>
         {isDurationSet ? (
-          <p className="text-slate-600 dark:text-beefy-dark-text-muted text-base sm:text-lg">
-            Удержание {exercise.durationSec} сек
-          </p>
+          <div className="space-y-4">
+            {isExerciseTimerRunning ? (
+              <div className="flex flex-col items-center">
+                <div className="text-5xl sm:text-6xl font-mono font-bold text-emerald-600 dark:text-emerald-400 tabular-nums mb-2">
+                  {exerciseTimerSeconds}
+                </div>
+                <p className="text-slate-600 dark:text-beefy-dark-text-muted text-sm">секунд осталось</p>
+              </div>
+            ) : (
+              <p className="text-slate-600 dark:text-beefy-dark-text-muted text-base sm:text-lg">
+                Удержание {exercise.durationSec} сек
+              </p>
+            )}
+          </div>
         ) : (
-          <p className="text-xl sm:text-2xl font-medium text-slate-800 dark:text-beefy-dark-text">
-            {workSet.weightKg} кг × {workSet.reps} повторений
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="text-xl sm:text-2xl font-medium text-slate-800 dark:text-beefy-dark-text">
+              {workSet.weightKg} кг ×{' '}
+              <button
+                type="button"
+                onClick={handleEditReps}
+                className="underline decoration-dotted hover:decoration-solid focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-400 rounded px-1"
+                title="Изменить количество повторений"
+              >
+                {workSet.reps}
+              </button>{' '}
+              повторений
+            </p>
+          </div>
         )}
       </div>
       <div className="flex flex-col gap-3 w-full">
@@ -231,7 +381,7 @@ export function ActiveWorkoutView({ workoutName, exercises, onComplete }: Active
           onClick={handleCompleteSet}
           className="w-full min-h-[52px] py-4 bg-emerald-600 dark:bg-emerald-500 text-white font-semibold rounded-xl hover:bg-emerald-500 dark:hover:bg-emerald-400 active:bg-emerald-700 dark:active:bg-emerald-600 touch-manipulation text-base"
         >
-          Готово
+          {isDurationSet && !isExerciseTimerRunning ? 'Начать' : 'Готово'}
         </button>
         <button
           type="button"
