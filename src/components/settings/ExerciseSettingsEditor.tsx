@@ -10,7 +10,6 @@ export function ExerciseSettingsEditor() {
   const [weights, setWeights] = useState(() => (schedule ? getNextWeights(schedule.planId) : {}))
   const [expandedWorkout, setExpandedWorkout] = useState<string | null>(null)
   const [editingExercise, setEditingExercise] = useState<{ planId: string; workoutId: string; exerciseId: string } | null>(null)
-  const [refreshKey, setRefreshKey] = useState(0)
 
   const currentPlan = useMemo(() => {
     if (!schedule) return null
@@ -48,7 +47,6 @@ export function ExerciseSettingsEditor() {
     }
     
     setEditingExercise(null)
-    setRefreshKey((k) => k + 1) // Обновляем компонент для пересчета отображения
   }
 
   return (

@@ -35,7 +35,7 @@ export function getExerciseStrengthStats(): ExerciseStrengthStats[] {
     for (const ex of entry.exercises) {
       let workoutMaxWeight = 0
       for (const set of ex.sets) {
-        if (set.skipped) continue
+        if (set.skipped || ('isWarmup' in set && set.isWarmup)) continue
         const w = set.weightKg
         const r = set.reps ?? 0
         if (w > 0 && r > 0) {
@@ -74,12 +74,12 @@ export function getExerciseStrengthStats(): ExerciseStrengthStats[] {
   return result.sort((a, b) => a.exerciseName.localeCompare(b.exerciseName))
 }
 
-/** Объём за подход: вес × повторения (пропущенные не считаем) */
+/** Объём за подход: вес × повторения (пропущенные и разминочные не считаем) */
 function volumeFromSets(
-  sets: { weightKg: number; reps: number; skipped?: boolean }[]
+  sets: { weightKg: number; reps: number; skipped?: boolean; isWarmup?: boolean }[]
 ): number {
   return sets.reduce(
-    (sum, s) => sum + (s.skipped ? 0 : s.weightKg * s.reps),
+    (sum, s) => sum + (s.skipped || s.isWarmup ? 0 : s.weightKg * s.reps),
     0
   )
 }
@@ -135,7 +135,7 @@ export function getHistoryByDay(): DayAggregate[] {
       let maxW = 0
       let max1RM = 0
       for (const set of ex.sets) {
-        if (set.skipped) continue
+        if (set.skipped || ('isWarmup' in set && set.isWarmup)) continue
         const w = set.weightKg
         const r = set.reps ?? 0
         if (w > 0) {

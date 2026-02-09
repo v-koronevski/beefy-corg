@@ -4,6 +4,7 @@ export interface WorkSet {
   reps: number
   skipped?: boolean
   durationSec?: number
+  isWarmup?: boolean
 }
 
 /** Упражнение в шаблоне тренировки */

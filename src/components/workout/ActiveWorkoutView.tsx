@@ -34,6 +34,29 @@ export function ActiveWorkoutView({ workoutName, exercises, onComplete }: Active
   const workSet = exercise?.sets[setIndex]
   const isResting = restSecondsLeft !== null
   const ratingExercise = ratingExerciseIndex !== null ? exercises[ratingExerciseIndex ?? 0] : null
+  
+  // Разделяем подходы на разминочные и рабочие
+  const exerciseSets = exercise ? {
+    warmup: exercise.sets.filter((s) => s.isWarmup),
+    work: exercise.sets.filter((s) => !s.isWarmup),
+  } : { warmup: [], work: [] }
+  
+  // Определяем текущий тип подхода (разминочный или рабочий) и индекс в типе
+  const isWarmupSet = workSet?.isWarmup ?? false
+  let currentSetIndexInType = 0
+  if (exercise) {
+    if (isWarmupSet) {
+      // Считаем сколько разминочных подходов до текущего
+      for (let i = 0; i < setIndex; i++) {
+        if (exercise.sets[i]?.isWarmup) {
+          currentSetIndexInType++
+        }
+      }
+    } else {
+      // Для рабочих подходов вычитаем количество разминочных
+      currentSetIndexInType = setIndex - exerciseSets.warmup.length
+    }
+  }
 
   const advanceToNext = useCallback(() => {
     if (!exercise) return
@@ -50,7 +73,7 @@ export function ActiveWorkoutView({ workoutName, exercises, onComplete }: Active
       setSetIndex(0)
       return
     }
-    onComplete(exerciseRatings)
+    onComplete(exerciseRatings, exerciseNotes)
   }, [exercise, exerciseIndex, setIndex, exercises.length, onComplete, exerciseRatings])
 
   const finishExerciseAndMaybeRate = useCallback(() => {
@@ -131,6 +154,13 @@ export function ActiveWorkoutView({ workoutName, exercises, onComplete }: Active
       finishExerciseAndMaybeRate()
       return
     }
+    // Для разминочных подходов отдых короче или отсутствует
+    const isWarmupSet = workSet?.isWarmup
+    if (isWarmupSet) {
+      // Переходим сразу к следующему подходу без отдыха
+      advanceToNext()
+      return
+    }
     setRestTotal(getRestSeconds(exercise))
     setRestSecondsLeft(getRestSeconds(exercise))
   }
@@ -146,11 +176,15 @@ export function ActiveWorkoutView({ workoutName, exercises, onComplete }: Active
   }
 
   if (!exercise || workSet === undefined) {
-    onComplete(exerciseRatings)
+    onComplete(exerciseRatings, exerciseNotes)
     return null
   }
 
-  const setLabel = `Подход ${setIndex + 1} из ${exercise.sets.length}`
+  const warmupCount = exerciseSets.warmup.length
+  const workCount = exerciseSets.work.length
+  const setLabel = isWarmupSet
+    ? `Разминка ${currentSetIndexInType + 1} из ${warmupCount}`
+    : `Рабочий подход ${currentSetIndexInType + 1} из ${workCount}`
   const isDurationSet = !!exercise.durationSec
   const isExerciseTimerRunning = exerciseTimerSeconds !== null && exerciseTimerSeconds > 0
 
@@ -189,8 +223,10 @@ export function ActiveWorkoutView({ workoutName, exercises, onComplete }: Active
     const exercisesNeedingRating = exercises
       .map((ex, idx) => ({ ex, idx }))
       .filter(({ ex }) => !ex.durationSec && !ex.bodyweight)
-    const isLastRatingExercise = exercisesNeedingRating.length > 0 && 
-      exercisesNeedingRating[exercisesNeedingRating.length - 1].idx === exerciseIndex
+    const lastRatingExercise = exercisesNeedingRating.length > 0 
+      ? exercisesNeedingRating[exercisesNeedingRating.length - 1]
+      : null
+    const isLastRatingExercise = lastRatingExercise?.idx === exerciseIndex
     
     if (isLastRatingExercise) {
       // Последнее упражнение с выбором веса - завершаем тренировку с заметками
@@ -254,8 +290,10 @@ export function ActiveWorkoutView({ workoutName, exercises, onComplete }: Active
     const exercisesNeedingRating = exercises
       .map((ex, idx) => ({ ex, idx }))
       .filter(({ ex }) => !ex.durationSec && !ex.bodyweight)
-    const isLastRatingExercise = exercisesNeedingRating.length > 0 && 
-      exercisesNeedingRating[exercisesNeedingRating.length - 1].idx === exerciseIndex
+    const lastRatingExercise = exercisesNeedingRating.length > 0 
+      ? exercisesNeedingRating[exercisesNeedingRating.length - 1]
+      : null
+    const isLastRatingExercise = lastRatingExercise?.idx === exerciseIndex
     return (
       <div className="space-y-6 w-full min-w-0 max-w-full">
         <p className="text-slate-500 dark:text-beefy-dark-text-muted text-sm">{workoutName}</p>
@@ -301,24 +339,26 @@ export function ActiveWorkoutView({ workoutName, exercises, onComplete }: Active
               )
             })}
           </div>
-          <div className="mt-6 pt-6 border-t border-slate-200 dark:border-beefy-dark-border">
-            <label htmlFor={`exercise-notes-${ratingExercise.id}`} className="block text-sm font-semibold text-slate-800 dark:text-beefy-dark-text mb-2">
-              📝 Заметки к упражнению (необязательно)
-            </label>
-            <textarea
-              id={`exercise-notes-${ratingExercise.id}`}
-              value={exerciseNotes[ratingExercise.id] || ''}
-              onChange={(e) => setExerciseNotes((prev) => ({ ...prev, [ratingExercise.id]: e.target.value }))}
-              placeholder="Как прошло упражнение? Что заметил? Что можно улучшить?"
-              rows={3}
-              className="w-full px-4 py-3 text-sm border-2 border-slate-300 dark:border-beefy-dark-border rounded-xl bg-white dark:bg-beefy-dark-bg text-slate-800 dark:text-beefy-dark-text placeholder:text-slate-400 dark:placeholder:text-beefy-dark-text-muted focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-400 focus:border-emerald-500 dark:focus:border-emerald-400 resize-none"
-            />
-            {(exerciseNotes[ratingExercise.id]?.trim()) && (
-              <p className="text-xs text-slate-500 dark:text-beefy-dark-text-muted mt-1">
-                Заметки будут сохранены вместе с упражнением
-              </p>
-            )}
-          </div>
+          {isLastRatingExercise && (
+            <div className="mt-6 pt-6 border-t border-slate-200 dark:border-beefy-dark-border">
+              <label htmlFor={`exercise-notes-${ratingExercise.id}`} className="block text-sm font-semibold text-slate-800 dark:text-beefy-dark-text mb-2">
+                📝 Заметки к упражнению (необязательно)
+              </label>
+              <textarea
+                id={`exercise-notes-${ratingExercise.id}`}
+                value={exerciseNotes[ratingExercise.id] || ''}
+                onChange={(e) => setExerciseNotes((prev) => ({ ...prev, [ratingExercise.id]: e.target.value }))}
+                placeholder="Как прошло упражнение? Что заметил? Что можно улучшить?"
+                rows={3}
+                className="w-full px-4 py-3 text-sm border-2 border-slate-300 dark:border-beefy-dark-border rounded-xl bg-white dark:bg-beefy-dark-bg text-slate-800 dark:text-beefy-dark-text placeholder:text-slate-400 dark:placeholder:text-beefy-dark-text-muted focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-400 focus:border-emerald-500 dark:focus:border-emerald-400 resize-none"
+              />
+              {(exerciseNotes[ratingExercise.id]?.trim()) && (
+                <p className="text-xs text-slate-500 dark:text-beefy-dark-text-muted mt-1">
+                  Заметки будут сохранены вместе с упражнением
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </div>
     )
@@ -453,19 +493,34 @@ export function ActiveWorkoutView({ workoutName, exercises, onComplete }: Active
             )}
           </div>
         ) : (
-          <div className="flex items-center gap-2">
-            <p className="text-xl sm:text-2xl font-medium text-slate-800 dark:text-beefy-dark-text">
-              {workSet.weightKg} кг ×{' '}
-              <button
-                type="button"
-                onClick={handleEditReps}
-                className="underline decoration-dotted hover:decoration-solid focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-400 rounded px-1"
-                title="Изменить количество повторений"
-              >
-                {workSet.reps}
-              </button>{' '}
-              повторений
-            </p>
+          <div className="space-y-2">
+            {isWarmupSet && (
+              <p className="text-xs font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wide">
+                Разминочный подход
+              </p>
+            )}
+            <div className="flex items-center gap-2">
+              <p className={`text-xl sm:text-2xl font-medium ${isWarmupSet ? 'text-blue-700 dark:text-blue-300' : 'text-slate-800 dark:text-beefy-dark-text'}`}>
+                {workSet.weightKg} кг ×{' '}
+                {!isWarmupSet && (
+                  <button
+                    type="button"
+                    onClick={handleEditReps}
+                    className="underline decoration-dotted hover:decoration-solid focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-400 rounded px-1"
+                    title="Изменить количество повторений"
+                  >
+                    {workSet.reps}
+                  </button>
+                )}
+                {isWarmupSet && <span>{workSet.reps}</span>}{' '}
+                повторений
+              </p>
+            </div>
+            {isWarmupSet && warmupCount > 0 && (
+              <p className="text-xs text-slate-500 dark:text-beefy-dark-text-muted">
+                После разминки: {workCount} рабочих подходов по {exerciseSets.work[0]?.weightKg ?? 0} кг
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -486,21 +541,66 @@ export function ActiveWorkoutView({ workoutName, exercises, onComplete }: Active
         </button>
       </div>
       <ul className="text-xs sm:text-sm text-slate-500 dark:text-beefy-dark-text-muted space-y-1">
-        {exercises.map((ex, ei) => (
-          <li key={ex.id}>
-            {ex.name}:{' '}
-            {ex.sets.map((s, si) => {
-              const isCurrent = ei === exerciseIndex && si === setIndex
-              const done = ei < exerciseIndex || (ei === exerciseIndex && si < setIndex) || s.skipped
-              return (
-                <span key={si} className={isCurrent ? 'font-medium text-slate-800 dark:text-beefy-dark-text' : ''}>
-                  {done ? (s.skipped ? '—' : '✓') : isCurrent ? '●' : '○'}
-                  {si < ex.sets.length - 1 ? ', ' : ''}
-                </span>
-              )
-            })}
-          </li>
-        ))}
+        {exercises.map((ex, ei) => {
+          const exWarmup = ex.sets.filter((s) => s.isWarmup)
+          const exWork = ex.sets.filter((s) => !s.isWarmup)
+          return (
+            <li key={ex.id}>
+              {ex.name}:{' '}
+              {exWarmup.length > 0 && (
+                <>
+                  <span className="text-blue-600 dark:text-blue-400">[</span>
+                  {exWarmup.map((s, si) => {
+                    // Находим глобальный индекс разминочного подхода
+                    let globalIndex = -1
+                    let warmupCount = 0
+                    for (let i = 0; i < ex.sets.length; i++) {
+                      if (ex.sets[i]?.isWarmup) {
+                        if (warmupCount === si) {
+                          globalIndex = i
+                          break
+                        }
+                        warmupCount++
+                      }
+                    }
+                    const isCurrent = ei === exerciseIndex && globalIndex === setIndex
+                    const done = ei < exerciseIndex || (ei === exerciseIndex && globalIndex < setIndex) || s.skipped
+                    return (
+                      <span key={si} className={isCurrent ? 'font-medium text-blue-800 dark:text-blue-200' : ''}>
+                        {done ? (s.skipped ? '—' : '✓') : isCurrent ? '●' : '○'}
+                        {si < exWarmup.length - 1 ? ', ' : ''}
+                      </span>
+                    )
+                  })}
+                  <span className="text-blue-600 dark:text-blue-400">]</span>
+                  {exWork.length > 0 && ' '}
+                </>
+              )}
+              {exWork.map((s, si) => {
+                // Находим глобальный индекс рабочего подхода
+                let globalIndex = -1
+                let workCount = 0
+                for (let i = 0; i < ex.sets.length; i++) {
+                  if (!ex.sets[i]?.isWarmup) {
+                    if (workCount === si) {
+                      globalIndex = i
+                      break
+                    }
+                    workCount++
+                  }
+                }
+                const isCurrent = ei === exerciseIndex && globalIndex === setIndex
+                const done = ei < exerciseIndex || (ei === exerciseIndex && globalIndex < setIndex) || s.skipped
+                return (
+                  <span key={si} className={isCurrent ? 'font-medium text-slate-800 dark:text-beefy-dark-text' : ''}>
+                    {done ? (s.skipped ? '—' : '✓') : isCurrent ? '●' : '○'}
+                    {si < exWork.length - 1 ? ', ' : ''}
+                  </span>
+                )
+              })}
+            </li>
+          )
+        })}
       </ul>
     </div>
   )

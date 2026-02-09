@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from 'react'
+import { useMemo, useState, useCallback, useEffect } from 'react'
 import {
   getSchedule,
   getNextWeights,
@@ -9,6 +9,7 @@ import {
   setSchedule,
   addWorkoutHistoryEntry,
   getTodayDateString,
+  migrateDataIfNeeded,
 } from '@/utils/storage'
 import { getPlanById, VALENTIN_PLAN_ID } from '@/data/plans'
 import { getHelenAllExerciseIds, getNextWeightKg } from '@/data/helenPlan'
@@ -34,6 +35,11 @@ function cloneExercises(exercises: UpcomingWorkoutItem['exercises']) {
 }
 
 export default function App() {
+  // Миграция данных при загрузке приложения
+  useEffect(() => {
+    migrateDataIfNeeded()
+  }, [])
+  
   const [onboardingDone, setOnboardingDone] = useState(isOnboardingCompleted)
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null)
   const schedule = useMemo(() => getSchedule(), [onboardingDone])
@@ -89,17 +95,20 @@ export default function App() {
       exercises: activeWorkout.exercises.map((ex) => ({
         id: ex.id,
         name: ex.name,
-        sets: ex.sets.map((s) => {
-          const set: { weightKg: number; reps: number; skipped?: boolean; durationSec?: number } = {
-            weightKg: s.weightKg,
-            reps: s.reps,
-            skipped: s.skipped,
-          }
-          if (ex.durationSec) {
-            set.durationSec = ex.durationSec
-          }
-          return set
-        }),
+        // Сохраняем только рабочие подходы (без разминочных)
+        sets: ex.sets
+          .filter((s) => !s.isWarmup)
+          .map((s) => {
+            const set: { weightKg: number; reps: number; skipped?: boolean; durationSec?: number } = {
+              weightKg: s.weightKg,
+              reps: s.reps,
+              skipped: s.skipped,
+            }
+            if (ex.durationSec) {
+              set.durationSec = ex.durationSec
+            }
+            return set
+          }),
         notes: exerciseNotes[ex.id]?.trim() || undefined,
       })),
     })

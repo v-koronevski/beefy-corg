@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { getWorkoutHistory, setWorkoutHistory } from '@/utils/storage'
 import type { WorkoutHistoryEntry } from '@/types'
 

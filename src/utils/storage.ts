@@ -9,6 +9,10 @@ const KEY_HISTORY = 'workout_history'
 const KEY_MEASUREMENTS = 'body_measurements'
 const KEY_THEME = 'app_theme'
 const KEY_EXERCISE_SETTINGS = 'exercise_settings'
+const KEY_DATA_VERSION = 'data_version'
+
+// Версия схемы данных (увеличиваем при изменениях структуры)
+const CURRENT_DATA_VERSION = 2
 
 export type ThemeId = 'light' | 'dark' | 'system'
 
@@ -245,4 +249,88 @@ export function setExerciseSetting(exerciseId: string, setting: ExerciseSettings
     all[exerciseId] = setting
   }
   setExerciseSettings(all)
+}
+
+/** Получить текущую версию данных */
+function getDataVersion(): number {
+  try {
+    const v = localStorage.getItem(KEY_DATA_VERSION)
+    return v ? parseInt(v, 10) : 1
+  } catch {
+    return 1
+  }
+}
+
+/** Установить версию данных */
+function setDataVersion(version: number): void {
+  localStorage.setItem(KEY_DATA_VERSION, String(version))
+}
+
+/**
+ * Миграция данных из старых версий в новую
+ * Вызывается при загрузке приложения
+ */
+export function migrateDataIfNeeded(): void {
+  const currentVersion = getDataVersion()
+  
+  if (currentVersion >= CURRENT_DATA_VERSION) {
+    return // Данные уже актуальны
+  }
+  
+  // Миграция с версии 1 на версию 2
+  if (currentVersion < 2) {
+    migrateHistoryNotesFromWorkoutToExercise()
+    setDataVersion(2)
+  }
+}
+
+/**
+ * Миграция заметок из уровня тренировки в уровень упражнения
+ * Старая структура: WorkoutHistoryEntry.notes
+ * Новая структура: WorkoutHistoryEntry.exercises[].notes
+ */
+function migrateHistoryNotesFromWorkoutToExercise(): void {
+  try {
+    const raw = localStorage.getItem(KEY_HISTORY)
+    if (!raw) return
+    
+    const history = JSON.parse(raw) as Array<{
+      date: string
+      workoutId: string
+      workoutName: string
+      exercises: Array<{
+        id: string
+        name: string
+        sets: Array<{ weightKg: number; reps: number; skipped?: boolean; durationSec?: number }>
+        notes?: string
+      }>
+      notes?: string // Старое поле на уровне тренировки
+    }>
+    
+    let needsUpdate = false
+    const migrated = history.map((entry) => {
+      // Если есть старое поле notes на уровне тренировки и нет заметок в упражнениях
+      if (entry.notes && !entry.exercises.some((ex) => ex.notes)) {
+        needsUpdate = true
+        // Распределяем заметку на первое упражнение (или можно на все, но логичнее на первое)
+        const updatedExercises = entry.exercises.map((ex, idx) => ({
+          ...ex,
+          notes: idx === 0 ? entry.notes : ex.notes,
+        }))
+        // Удаляем старое поле notes
+        const { notes, ...rest } = entry
+        return {
+          ...rest,
+          exercises: updatedExercises,
+        }
+      }
+      return entry
+    })
+    
+    if (needsUpdate) {
+      localStorage.setItem(KEY_HISTORY, JSON.stringify(migrated))
+    }
+  } catch {
+    // Если миграция не удалась, продолжаем работу (старые данные останутся как есть)
+  }
 }

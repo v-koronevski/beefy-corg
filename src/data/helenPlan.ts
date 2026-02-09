@@ -1,4 +1,4 @@
-import type { ExerciseInWorkout, WorkoutTemplate, WorkoutPlan, MuscleGroupId, ExerciseSettings } from '@/types'
+import type { ExerciseInWorkout, WorkoutTemplate, WorkoutPlan, MuscleGroupId, ExerciseSettings, WorkSet } from '@/types'
 import { getExerciseSettings, getExerciseSetting } from '@/utils/storage'
 
 export const HELEN_PLAN_ID = 'helen-fullbody'
@@ -73,6 +73,50 @@ export function getWorkoutById(workoutId: string): WorkoutTemplate | undefined {
   return helenPlan.workouts.find((w) => w.id === workoutId)
 }
 
+/**
+ * Генерирует 3 разминочных подхода: 50% (5 reps), 70% (3 reps), 90% (1 rep)
+ * Веса округляются до кратных 5 кг
+ */
+function generateWarmupSets(workingWeight: number, exerciseId: string): WorkSet[] {
+  // Минимальный порог для включения разминки (кг)
+  // Для гантелей (обычно легче) - 10 кг, для остального - 20 кг
+  const MIN_WEIGHT_FOR_WARMUP = exerciseId === 'rumynskaya' || exerciseId === 'zhim-naklon' ? 10 : 20
+  
+  if (workingWeight < MIN_WEIGHT_FOR_WARMUP) {
+    return []
+  }
+  
+  // Функция округления до кратного 5 кг
+  const roundTo5 = (weight: number): number => {
+    return Math.round(weight / 5) * 5
+  }
+  
+  // Прогрессивный протокол: 50% (5 reps), 70% (5 reps), 90% (5 reps)
+  // Округляем до кратных 5 кг, все подходы по 5 повторений
+  const warmupSets: WorkSet[] = [
+    { weightKg: roundTo5(workingWeight * 0.5), reps: 5, isWarmup: true },
+    { weightKg: roundTo5(workingWeight * 0.7), reps: 5, isWarmup: true },
+    { weightKg: roundTo5(workingWeight * 0.9), reps: 5, isWarmup: true },
+  ]
+  
+  // Убираем дубликаты, подходы >= рабочего веса, и первый подход если он ниже минимального порога
+  const uniqueSets: WorkSet[] = []
+  const seenWeights = new Set<number>()
+  for (let i = 0; i < warmupSets.length; i++) {
+    const set = warmupSets[i]!
+    // Первый подход (50%) должен быть >= минимального порога
+    if (i === 0 && set.weightKg < MIN_WEIGHT_FOR_WARMUP) {
+      continue
+    }
+    if (!seenWeights.has(set.weightKg) && set.weightKg > 0 && set.weightKg < workingWeight) {
+      seenWeights.add(set.weightKg)
+      uniqueSets.push(set)
+    }
+  }
+  
+  return uniqueSets
+}
+
 /** Создать из шаблона тренировку с весами (для отображения и старта) */
 export function buildWorkoutWithWeights(
   workout: WorkoutTemplate,
@@ -91,16 +135,27 @@ export function buildWorkoutWithWeights(
     const sets = settings?.sets ?? ex.sets
     const reps = settings?.reps ?? ex.reps
     const durationSec = settings?.durationSec ?? ex.durationSec
+    const workingWeight = weights[ex.id] ?? 0
+    
+    // Генерируем разминочные подходы для упражнений с весом
+    const warmupSets: WorkSet[] = 
+      !ex.durationSec && !ex.bodyweight && !BODYWEIGHT_EXERCISE_IDS.has(ex.id) && workingWeight > 0
+        ? generateWarmupSets(workingWeight, ex.id)
+        : []
+    
+    // Рабочие подходы
+    const workSets: WorkSet[] = Array.from({ length: sets }, () => ({
+      weightKg: workingWeight,
+      reps,
+      isWarmup: false,
+    }))
     
     return {
       id: ex.id,
       name: ex.name,
       durationSec,
       bodyweight: ex.bodyweight ?? BODYWEIGHT_EXERCISE_IDS.has(ex.id),
-      sets: Array.from({ length: sets }, () => ({
-        weightKg: weights[ex.id] ?? 0,
-        reps,
-      })),
+      sets: [...warmupSets, ...workSets],
     }
   })
 }
