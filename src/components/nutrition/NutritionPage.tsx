@@ -3,8 +3,10 @@ import { getBodyMeasurements, getCalorieProfile, setCalorieProfile } from '@/uti
 import { calculateDailyCalories, calculateMacros } from '@/utils/calories'
 import type { CalorieProfile, ActivityLevel, NutritionGoal } from '@/types'
 
-const DEFICIT_KCAL = 400
-const SURPLUS_KCAL = 400
+/** Дефицит калорий в долях от суточной нормы (15% ≈ −400 ккал при TDEE 2650) */
+const DEFICIT_PERCENT = 0.15
+/** Профицит калорий в долях от суточной нормы (15% ≈ +400 ккал при TDEE 2650) */
+const SURPLUS_PERCENT = 0.15
 
 function getLastWeight(): number | null {
   const list = getBodyMeasurements()
@@ -58,9 +60,9 @@ export function NutritionPage() {
     calorieResult == null
       ? null
       : goal === 'loss'
-        ? Math.max(1200, calorieResult.tdee - DEFICIT_KCAL)
+        ? Math.max(1200, Math.round(calorieResult.tdee * (1 - DEFICIT_PERCENT)))
         : goal === 'gain'
-          ? calorieResult.tdee + SURPLUS_KCAL
+          ? Math.round(calorieResult.tdee * (1 + SURPLUS_PERCENT))
           : calorieResult.tdee
 
   const macros =
