@@ -90,6 +90,7 @@ export function MeasurementsPage() {
           <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">Замеры сохранены</p>
         </div>
       )}
+
       <section className="bg-white dark:bg-beefy-dark-bg-card rounded-xl border border-beefy-primary/20 dark:border-beefy-dark-border p-4 shadow-sm min-w-0">
         <h2 className="text-lg font-semibold text-beefy-primary dark:text-beefy-dark-text mb-4">Добавить замер</h2>
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>

@@ -24,6 +24,7 @@ import { OnboardingWeights } from '@/components/onboarding/OnboardingWeights'
 import { ActiveWorkoutView } from '@/components/workout/ActiveWorkoutView'
 import { ProgressPage } from '@/components/progress/ProgressPage'
 import { MeasurementsPage } from '@/components/measurements/MeasurementsPage'
+import { NutritionPage } from '@/components/nutrition/NutritionPage'
 import { SettingsPage } from '@/components/settings/SettingsPage'
 import type { ExerciseRating } from '@/components/workout/ActiveWorkoutView'
 
@@ -50,7 +51,7 @@ export default function App() {
     workoutName: string
     exercises: ReturnType<typeof cloneExercises>
   } | null>(null)
-  const [mainTab, setMainTab] = useState<'workouts' | 'progress' | 'measurements' | 'settings'>('workouts')
+  const [mainTab, setMainTab] = useState<'workouts' | 'progress' | 'measurements' | 'nutrition' | 'settings'>('workouts')
 
   const isSettingsOpen = mainTab === 'settings'
 
@@ -254,6 +255,19 @@ export default function App() {
           >
             Замеры
           </button>
+          <button
+            role="tab"
+            aria-selected={mainTab === 'nutrition'}
+            type="button"
+            onClick={() => setMainTab('nutrition')}
+            className={`flex-1 min-h-[40px] rounded-xl text-sm font-medium touch-manipulation transition-colors ${
+              mainTab === 'nutrition'
+                ? 'bg-beefy-primary dark:bg-beefy-accent text-beefy-cream dark:text-white shadow-sm'
+                : 'text-beefy-text-secondary dark:text-beefy-dark-text-muted hover:bg-beefy-primary/10 dark:hover:bg-beefy-dark-border/30 hover:text-beefy-primary dark:hover:text-beefy-dark-text'
+            }`}
+          >
+            Питание
+          </button>
         </nav>
       )}
       <main className="flex-1 p-4 min-h-0 min-w-0 overflow-auto w-full max-w-full bg-beefy-cream-light dark:bg-beefy-dark-bg text-beefy-primary dark:text-beefy-dark-text">
@@ -263,6 +277,8 @@ export default function App() {
           <ProgressPage />
         ) : mainTab === 'measurements' ? (
           <MeasurementsPage />
+        ) : mainTab === 'nutrition' ? (
+          <NutritionPage />
         ) : hasSchedule ? (
           <UpcomingWorkouts onStartWorkout={handleStartWorkout} />
         ) : (

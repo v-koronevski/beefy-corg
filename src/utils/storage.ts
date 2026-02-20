@@ -1,4 +1,4 @@
-import type { WorkoutPlan, WorkoutSchedule, ScheduleDay, WorkoutHistoryEntry, BodyMeasurementEntry, ExerciseSettings } from '@/types'
+import type { WorkoutPlan, WorkoutSchedule, ScheduleDay, WorkoutHistoryEntry, BodyMeasurementEntry, ExerciseSettings, CalorieProfile } from '@/types'
 
 const KEY_PLANS = 'workout_plans'
 const KEY_SCHEDULE = 'workout_schedule'
@@ -11,6 +11,7 @@ const KEY_THEME = 'app_theme'
 const KEY_EXERCISE_SETTINGS = 'exercise_settings'
 const KEY_DATA_VERSION = 'data_version'
 const KEY_SCHEDULE_DATES = 'workout_schedule_dates'
+const KEY_CALORIE_PROFILE = 'calorie_profile'
 
 // Версия схемы данных (увеличиваем при изменениях структуры)
 const CURRENT_DATA_VERSION = 2
@@ -161,6 +162,25 @@ export function setBodyMeasurements(entries: BodyMeasurementEntry[]): void {
   localStorage.setItem(KEY_MEASUREMENTS, JSON.stringify(entries))
 }
 
+const VALID_GOALS = ['loss', 'maintain', 'gain'] as const
+
+export function getCalorieProfile(): CalorieProfile | null {
+  try {
+    const raw = localStorage.getItem(KEY_CALORIE_PROFILE)
+    if (!raw) return null
+    const o = JSON.parse(raw) as Record<string, unknown>
+    if (typeof o.heightCm !== 'number' || typeof o.birthYear !== 'number' || (o.sex !== 'male' && o.sex !== 'female') || !['sedentary', 'light', 'moderate', 'active', 'extra'].includes(o.activityLevel as string)) return null
+    const goal = o.goal != null && VALID_GOALS.includes(o.goal as (typeof VALID_GOALS)[number]) ? (o.goal as CalorieProfile['goal']) : 'maintain'
+    return { ...o, goal } as CalorieProfile
+  } catch {
+    return null
+  }
+}
+
+export function setCalorieProfile(profile: CalorieProfile): void {
+  localStorage.setItem(KEY_CALORIE_PROFILE, JSON.stringify(profile))
+}
+
 function tryParseJson(s: string | null): unknown {
   if (s == null) return null
   try {
@@ -183,6 +203,7 @@ export function exportAppData(): string {
     [KEY_EXERCISE_SETTINGS]: tryParseJson(localStorage.getItem(KEY_EXERCISE_SETTINGS)),
     [KEY_SCHEDULE_DATES]: tryParseJson(localStorage.getItem(KEY_SCHEDULE_DATES)),
     [KEY_DATA_VERSION]: localStorage.getItem(KEY_DATA_VERSION),
+    [KEY_CALORIE_PROFILE]: tryParseJson(localStorage.getItem(KEY_CALORIE_PROFILE)),
   }
   return JSON.stringify(data)
 }
@@ -205,6 +226,7 @@ export function importAppData(jsonString: string): { success: boolean; error?: s
       KEY_EXERCISE_SETTINGS,
       KEY_SCHEDULE_DATES,
       KEY_DATA_VERSION,
+      KEY_CALORIE_PROFILE,
     ]
     for (const k of keys) {
       const v = data[k]

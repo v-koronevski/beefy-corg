@@ -113,6 +113,22 @@ export interface BodyMeasurementEntry {
   values: Partial<Record<BodyMeasurementKey, number>> // вес в кг, остальное в см
 }
 
+/** Уровень активности для расчёта суточной нормы калорий (TDEE) */
+export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'extra'
+
+/** Цель по питанию: калории и БЖУ подстраиваются под цель */
+export type NutritionGoal = 'loss' | 'maintain' | 'gain'
+
+/** Профиль для расчёта калорий: рост, возраст (через год рождения), пол, активность, цель */
+export interface CalorieProfile {
+  heightCm: number
+  birthYear: number
+  sex: 'male' | 'female'
+  activityLevel: ActivityLevel
+  /** Цель: похудение, поддержание, набор массы */
+  goal?: NutritionGoal
+}
+
 /** Настройки упражнения: шаг изменения веса, подходы, повторения */
 export interface ExerciseSettings {
   /** Шаг увеличения веса при выборе "добавить" (кг) */
