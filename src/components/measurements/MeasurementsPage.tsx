@@ -57,6 +57,13 @@ export function MeasurementsPage() {
     refresh()
   }
 
+  const handleDeleteMeasurement = (dateToDelete: string) => {
+    if (!window.confirm('Удалить замер от этой даты?')) return
+    const filtered = entries.filter((e) => e.date !== dateToDelete)
+    setBodyMeasurements(filtered)
+    refresh()
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     const values: Partial<Record<BodyMeasurementKey, number>> = {}
@@ -83,16 +90,17 @@ export function MeasurementsPage() {
           <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">Замеры сохранены</p>
         </div>
       )}
-      <section className="bg-white dark:bg-beefy-dark-bg-card rounded-xl border border-beefy-primary/20 dark:border-beefy-dark-border p-4 shadow-sm min-w-0 overflow-hidden">
+      <section className="bg-white dark:bg-beefy-dark-bg-card rounded-xl border border-beefy-primary/20 dark:border-beefy-dark-border p-4 shadow-sm min-w-0">
         <h2 className="text-lg font-semibold text-beefy-primary dark:text-beefy-dark-text mb-4">Добавить замер</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
           <div>
             <label className="block text-sm font-medium text-beefy-text-secondary dark:text-beefy-dark-text-muted mb-1">Дата</label>
             <input
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="w-full max-w-full min-h-[44px] rounded-lg border border-beefy-primary/30 dark:border-beefy-dark-border bg-white dark:bg-beefy-dark-bg text-beefy-primary dark:text-beefy-dark-text px-3 py-2 box-border"
+              className="w-full max-w-full min-h-[48px] rounded-lg border border-beefy-primary/30 dark:border-beefy-dark-border bg-white dark:bg-beefy-dark-bg text-beefy-primary dark:text-beefy-dark-text px-3 py-2 box-border touch-manipulation"
+              style={{ minHeight: 48 }}
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -104,6 +112,7 @@ export function MeasurementsPage() {
                 <input
                   type="text"
                   inputMode="decimal"
+                  autoComplete="off"
                   placeholder="0"
                   value={valueStrings[key] ?? ''}
                   onChange={(e) => {
@@ -125,6 +134,45 @@ export function MeasurementsPage() {
           </button>
         </form>
       </section>
+
+      {entries.length > 0 && (
+        <section className="bg-white dark:bg-beefy-dark-bg-card rounded-xl border border-beefy-primary/20 dark:border-beefy-dark-border p-4 shadow-sm min-w-0">
+          <h2 className="text-lg font-semibold text-beefy-primary dark:text-beefy-dark-text mb-4">Предыдущие замеры</h2>
+          <ul className="space-y-3">
+            {[...entries]
+              .sort((a, b) => b.date.localeCompare(a.date))
+              .map((entry) => (
+                <li
+                  key={entry.date}
+                  className="flex flex-wrap items-center justify-between gap-2 py-2 border-b border-beefy-primary/10 dark:border-beefy-dark-border last:border-b-0"
+                >
+                  <div className="text-sm text-beefy-primary dark:text-beefy-dark-text min-w-0 flex-1">
+                    <span className="font-medium">
+                      {new Date(entry.date + 'T12:00:00').toLocaleDateString('ru-RU', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </span>
+                    <span className="text-beefy-text-secondary dark:text-beefy-dark-text-muted ml-2">
+                      {MEASUREMENT_KEYS.filter((k) => entry.values[k] != null && entry.values[k]! > 0)
+                        .map((k) => `${MEASUREMENT_LABELS[k]}: ${entry.values[k]} ${getUnit(k)}`)
+                        .join(', ')}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteMeasurement(entry.date)}
+                    className="shrink-0 min-h-[36px] px-3 py-1.5 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 border border-red-200 dark:border-red-800 touch-manipulation"
+                    aria-label="Удалить замер"
+                  >
+                    Удалить
+                  </button>
+                </li>
+              ))}
+          </ul>
+        </section>
+      )}
 
       {entries.length === 0 && (
         <div className="text-center text-beefy-text-secondary dark:text-beefy-dark-text-muted text-sm py-8 space-y-4">
