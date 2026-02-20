@@ -77,7 +77,7 @@ export function getWorkoutById(workoutId: string): WorkoutTemplate | undefined {
  * Генерирует 3 разминочных подхода: 50% (5 reps), 70% (3 reps), 90% (1 rep)
  * Веса округляются до кратных 5 кг
  */
-function generateWarmupSets(workingWeight: number, exerciseId: string): WorkSet[] {
+function generateWarmupSets(workingWeight: number): WorkSet[] {
   // Минимальный порог для включения разминки (кг)
   // Для гантелей (обычно легче) - 10 кг, для остального - 20 кг
   const MIN_WEIGHT_FOR_WARMUP = 20
@@ -140,7 +140,7 @@ export function buildWorkoutWithWeights(
     // Генерируем разминочные подходы для упражнений с весом
     const warmupSets: WorkSet[] = 
       !ex.durationSec && !ex.bodyweight && !BODYWEIGHT_EXERCISE_IDS.has(ex.id) && workingWeight > 0
-        ? generateWarmupSets(workingWeight, ex.id)
+        ? generateWarmupSets(workingWeight)
         : []
     
     // Рабочие подходы
