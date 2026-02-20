@@ -93,7 +93,7 @@ export function MeasurementsPage() {
       <section className="bg-white dark:bg-beefy-dark-bg-card rounded-xl border border-beefy-primary/20 dark:border-beefy-dark-border p-4 shadow-sm min-w-0">
         <h2 className="text-lg font-semibold text-beefy-primary dark:text-beefy-dark-text mb-4">Добавить замер</h2>
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-          <div>
+          <div className="w-full max-w-full">
             <label className="block text-sm font-medium text-beefy-text-secondary dark:text-beefy-dark-text-muted mb-1">Дата</label>
             <input
               type="date"

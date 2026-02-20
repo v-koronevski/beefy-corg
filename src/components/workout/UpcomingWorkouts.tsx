@@ -247,11 +247,11 @@ function ChangeDateModal({ workoutName, currentDate, onSave, onCancel }: ChangeD
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 dark:bg-black/70 pb-[env(safe-area-inset-bottom)] sm:pb-4 min-h-[100dvh]"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 dark:bg-black/70 min-h-[100dvh]"
       onClick={onCancel}
     >
       <div
-        className="bg-white dark:bg-beefy-dark-bg-card rounded-t-2xl sm:rounded-xl shadow-lg p-6 w-full max-w-sm border border-beefy-primary/20 dark:border-beefy-dark-border max-h-[85dvh] sm:max-h-[80vh] overflow-y-auto overflow-x-visible"
+        className="bg-white dark:bg-beefy-dark-bg-card rounded-xl shadow-lg p-6 w-full max-w-sm border border-beefy-primary/20 dark:border-beefy-dark-border"
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="text-lg font-semibold text-beefy-primary dark:text-beefy-dark-text mb-2">
@@ -261,7 +261,7 @@ function ChangeDateModal({ workoutName, currentDate, onSave, onCancel }: ChangeD
           {workoutName}
         </p>
         <div className="space-y-4">
-          <div className="[&_input[type=date]]:min-h-[48px]">
+          <div className="w-full max-w-full [&_input[type=date]]:min-h-[48px]">
             <label htmlFor="schedule-date-input" className="block text-sm font-medium text-beefy-primary dark:text-beefy-dark-text mb-2">
               Дата
             </label>

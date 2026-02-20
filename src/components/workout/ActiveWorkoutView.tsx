@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { getNextWeightKg } from '@/data/helenPlan'
 import { getWorkoutHistory } from '@/utils/storage'
+import { getExerciseTechnique } from '@/data/exerciseTechniques'
 import type { ExerciseInWorkout } from '@/types'
 
 export type ExerciseRating = 'deload' | 'same' | 'add'
@@ -31,6 +32,7 @@ export function ActiveWorkoutView({ workoutName, exercises, onComplete }: Active
   const [editingReps, setEditingReps] = useState<{ exerciseIndex: number; setIndex: number } | null>(null)
   const [tempRepsValue, setTempRepsValue] = useState('')
   const [exerciseNotes, setExerciseNotes] = useState<Record<string, string>>({})
+  const [infoExercise, setInfoExercise] = useState<{ id: string; name: string } | null>(null)
 
   const exercise = exercises[exerciseIndex]
   const workSet = exercise?.sets[setIndex]
@@ -294,15 +296,63 @@ export function ActiveWorkoutView({ workoutName, exercises, onComplete }: Active
     return false
   }, [ratingExercise])
 
+  const infoTechnique = infoExercise ? getExerciseTechnique(infoExercise.id) : null
+  const TechniqueModal = infoExercise && infoTechnique ? (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 dark:bg-black/70"
+      onClick={() => setInfoExercise(null)}
+    >
+      <div
+        className="bg-white dark:bg-beefy-dark-bg-card rounded-xl shadow-lg p-6 w-full max-w-md max-h-[85vh] overflow-y-auto border border-beefy-primary/20 dark:border-beefy-dark-border"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <h3 className="text-lg font-semibold text-beefy-primary dark:text-beefy-dark-text">
+            {infoExercise.name}
+          </h3>
+          <button
+            type="button"
+            onClick={() => setInfoExercise(null)}
+            className="shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-full text-slate-500 hover:bg-slate-200 dark:hover:bg-beefy-dark-border/50 touch-manipulation"
+            aria-label="Закрыть"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <p className="text-sm text-slate-600 dark:text-beefy-dark-text-muted leading-relaxed">
+          {infoTechnique}
+        </p>
+      </div>
+    </div>
+  ) : null
+
   if (ratingExercise != null) {
     // Находим первый рабочий подход (не разминочный)
     const workSet = ratingExercise.sets.find((s) => !s.isWarmup)
     const currentKg = workSet?.weightKg ?? 0
     return (
+      <>
       <div className="space-y-6 w-full min-w-0 max-w-full">
         <p className="text-slate-500 dark:text-beefy-dark-text-muted text-sm">{workoutName}</p>
         <div className="bg-white dark:bg-beefy-dark-bg-card rounded-xl border border-slate-200 dark:border-beefy-dark-border p-4 sm:p-6 shadow-sm w-full">
-          <h3 className="text-lg sm:text-xl font-semibold text-slate-800 dark:text-beefy-dark-text mb-2">{ratingExercise.name}</h3>
+          <div className="flex items-center gap-2 mb-2">
+            <h3 className="text-lg sm:text-xl font-semibold text-slate-800 dark:text-beefy-dark-text">{ratingExercise.name}</h3>
+            {getExerciseTechnique(ratingExercise.id) && (
+              <button
+                type="button"
+                onClick={() => setInfoExercise({ id: ratingExercise.id, name: ratingExercise.name })}
+                className="shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-full text-slate-500 dark:text-beefy-dark-text-muted hover:bg-slate-200 dark:hover:bg-beefy-dark-border/50 hover:text-slate-700 dark:hover:text-beefy-dark-text touch-manipulation"
+                aria-label="Техника упражнения"
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M12 16v-4M12 8h.01" />
+                </svg>
+              </button>
+            )}
+          </div>
           {shouldRecommendIncrease && (
             <div className="mb-4 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800">
               <p className="text-sm font-medium text-blue-800 dark:text-blue-200 flex items-center gap-2">
@@ -364,11 +414,14 @@ export function ActiveWorkoutView({ workoutName, exercises, onComplete }: Active
           </div>
         </div>
       </div>
+      {TechniqueModal}
+      </>
     )
   }
 
   if (isResting && restSecondsLeft !== null && restTotal !== null && exercise) {
     const nextSetIdx = setIndex + 1
+    // Note: no info icon during rest - exercise name shown is "next" exercise
     const nextIsSameExercise = nextSetIdx < exercise.sets.length
     const nextExercise = nextIsSameExercise ? exercise : exercises[exerciseIndex + 1]
     const nextSet = nextIsSameExercise ? exercise.sets[nextSetIdx] : nextExercise?.sets[0]
@@ -387,7 +440,9 @@ export function ActiveWorkoutView({ workoutName, exercises, onComplete }: Active
     const cy = size / 2
     const circumference = 2 * Math.PI * r
     const strokeDashoffset = circumference - progress * circumference
+
     return (
+      <>
       <div className="flex flex-col items-center justify-center min-h-[45vh] sm:min-h-[50vh] px-4 w-full">
         <p className="text-slate-500 dark:text-beefy-dark-text-muted text-sm mb-4">Отдых</p>
         <div className="relative inline-flex items-center justify-center">
@@ -443,6 +498,8 @@ export function ActiveWorkoutView({ workoutName, exercises, onComplete }: Active
           Начать раньше
         </button>
       </div>
+      {TechniqueModal}
+      </>
     )
   }
 
@@ -450,6 +507,7 @@ export function ActiveWorkoutView({ workoutName, exercises, onComplete }: Active
   if (editingReps) {
     const editingExercise = exercises[editingReps.exerciseIndex]
     return (
+      <>
       <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center p-4 z-50">
         <div className="bg-white dark:bg-beefy-dark-bg-card rounded-xl border border-slate-200 dark:border-beefy-dark-border p-6 shadow-lg max-w-sm w-full">
           <h3 className="text-lg font-semibold text-slate-800 dark:text-beefy-dark-text mb-2">
@@ -496,15 +554,33 @@ export function ActiveWorkoutView({ workoutName, exercises, onComplete }: Active
           </div>
         </div>
       </div>
+      {TechniqueModal}
+      </>
     )
   }
 
   return (
+    <>
     <div className="space-y-6 w-full max-w-xl min-w-0">
       <p className="text-slate-500 dark:text-beefy-dark-text-muted text-sm">{workoutName}</p>
       <div className="bg-white dark:bg-beefy-dark-bg-card rounded-xl border border-slate-200 dark:border-beefy-dark-border p-4 sm:p-6 shadow-sm w-full">
         <p className="text-slate-500 dark:text-beefy-dark-text-muted text-sm mb-1">{setLabel}</p>
-        <h3 className="text-lg sm:text-xl font-semibold text-slate-800 dark:text-beefy-dark-text mb-2">{exercise.name}</h3>
+        <div className="flex items-center gap-2 mb-2">
+          <h3 className="text-lg sm:text-xl font-semibold text-slate-800 dark:text-beefy-dark-text">{exercise.name}</h3>
+          {getExerciseTechnique(exercise.id) && (
+            <button
+              type="button"
+              onClick={() => setInfoExercise({ id: exercise.id, name: exercise.name })}
+              className="shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-full text-slate-500 dark:text-beefy-dark-text-muted hover:bg-slate-200 dark:hover:bg-beefy-dark-border/50 hover:text-slate-700 dark:hover:text-beefy-dark-text touch-manipulation"
+              aria-label="Техника упражнения"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 16v-4M12 8h.01" />
+              </svg>
+            </button>
+          )}
+        </div>
         {isDurationSet ? (
           <div className="space-y-4">
             {isExerciseTimerRunning ? (
@@ -631,5 +707,7 @@ export function ActiveWorkoutView({ workoutName, exercises, onComplete }: Active
         })}
       </ul>
     </div>
+    {TechniqueModal}
+    </>
   )
 }
