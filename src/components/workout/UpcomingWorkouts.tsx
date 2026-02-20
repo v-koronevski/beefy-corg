@@ -261,7 +261,7 @@ function ChangeDateModal({ workoutName, currentDate, onSave, onCancel }: ChangeD
           {workoutName}
         </p>
         <div className="space-y-4">
-          <div className="w-full max-w-full [&_input[type=date]]:min-h-[48px]">
+          <div className="w-full max-w-[90%] [&_input[type=date]]:min-h-[48px]">
             <label htmlFor="schedule-date-input" className="block text-sm font-medium text-beefy-primary dark:text-beefy-dark-text mb-2">
               Дата
             </label>
