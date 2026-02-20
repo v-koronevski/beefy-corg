@@ -367,7 +367,16 @@ export function ActiveWorkoutView({ workoutName, exercises, onComplete }: Active
     )
   }
 
-  if (isResting && restSecondsLeft !== null && restTotal !== null) {
+  if (isResting && restSecondsLeft !== null && restTotal !== null && exercise) {
+    const nextSetIdx = setIndex + 1
+    const nextIsSameExercise = nextSetIdx < exercise.sets.length
+    const nextExercise = nextIsSameExercise ? exercise : exercises[exerciseIndex + 1]
+    const nextSet = nextIsSameExercise ? exercise.sets[nextSetIdx] : nextExercise?.sets[0]
+    const nextName = nextExercise?.name ?? ''
+    const nextWeight = nextSet && !nextExercise?.bodyweight && !nextExercise?.durationSec ? nextSet.weightKg : null
+    const nextReps = nextSet?.reps
+    const nextDuration = nextSet?.durationSec ?? nextExercise?.durationSec
+
     const mins = Math.floor(restSecondsLeft / 60)
     const secs = restSecondsLeft % 60
     const progress = 1 - restSecondsLeft / restTotal
@@ -410,6 +419,22 @@ export function ActiveWorkoutView({ workoutName, exercises, onComplete }: Active
           </span>
         </div>
         <p className="text-slate-400 dark:text-beefy-dark-text-muted text-sm mt-4">Следующий подход через...</p>
+        {nextName && (
+          <div className="mt-4 px-4 py-3 rounded-xl bg-slate-100 dark:bg-beefy-dark-border/30 border border-slate-200 dark:border-beefy-dark-border w-full max-w-xs text-center">
+            <p className="font-medium text-slate-800 dark:text-beefy-dark-text">{nextName}</p>
+            {nextDuration != null && nextDuration > 0 ? (
+              <p className="text-slate-600 dark:text-beefy-dark-text-muted text-sm mt-1">{nextDuration} сек</p>
+            ) : nextWeight != null && nextWeight > 0 ? (
+              <p className="text-slate-600 dark:text-beefy-dark-text-muted text-sm mt-1">
+                {nextWeight} кг{nextReps != null && nextReps > 0 ? ` × ${nextReps}` : ''}
+              </p>
+            ) : nextExercise?.bodyweight || nextWeight === 0 ? (
+              <p className="text-slate-600 dark:text-beefy-dark-text-muted text-sm mt-1">
+                {nextReps != null && nextReps > 0 ? `${nextReps} повторений` : 'собственный вес'}
+              </p>
+            ) : null}
+          </div>
+        )}
         <button
           type="button"
           onClick={handleStartEarly}

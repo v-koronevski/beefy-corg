@@ -1,12 +1,13 @@
-import { useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   getSchedule,
-  getUpcomingScheduleDates,
   getNextWeights,
   getTodayDateString,
   wasWorkoutCompletedOnDate,
-  dateToLocalDateString,
   getWorkoutHistory,
+  getPlannedScheduleDates,
+  setPlannedScheduleDates,
+  type PlannedWorkoutDate,
 } from '@/utils/storage'
 import { getPlanById, getWorkoutByIdFromPlan } from '@/data/plans'
 import { buildWorkoutWithWeights } from '@/data/helenPlan'
@@ -14,8 +15,12 @@ import type { UpcomingWorkoutItem } from '@/types'
 
 const DAY_NAMES: Record<number, string> = {
   1: 'Пн',
+  2: 'Вт',
   3: 'Ср',
+  4: 'Чт',
   5: 'Пт',
+  6: 'Сб',
+  7: 'Вс',
 }
 
 function formatDate(d: Date): string {
@@ -29,6 +34,12 @@ interface UpcomingWorkoutsProps {
   onStartWorkout: (item: UpcomingWorkoutItem) => void
 }
 
+function getDayName(dateStr: string): string {
+  const d = new Date(dateStr + 'T12:00:00').getDay()
+  const day = d === 0 ? 7 : d
+  return DAY_NAMES[day as keyof typeof DAY_NAMES] ?? ''
+}
+
 export function UpcomingWorkouts({ onStartWorkout }: UpcomingWorkoutsProps) {
   const schedule = getSchedule()
   const planId = schedule?.planId
@@ -37,36 +48,43 @@ export function UpcomingWorkouts({ onStartWorkout }: UpcomingWorkoutsProps) {
 
   const todayStr = getTodayDateString()
 
+  const [plannedDates, setPlannedDates] = useState<PlannedWorkoutDate[]>(() =>
+    schedule ? getPlannedScheduleDates(schedule) : []
+  )
+  const [editingDateFor, setEditingDateFor] = useState<{ date: string; workoutId: string; workoutName: string } | null>(null)
+
+  useEffect(() => {
+    if (schedule && plannedDates.length === 0) {
+      setPlannedDates(getPlannedScheduleDates(schedule))
+    }
+  }, [schedule])
+
   // Получаем последнюю тренировку из истории (только если она не сегодня)
   const lastWorkout = useMemo(() => {
     const history = getWorkoutHistory()
     if (history.length === 0) return null
     const sorted = [...history].sort((a, b) => b.date.localeCompare(a.date))
     const last = sorted[0]!
-    // Не показываем плашку, если последняя тренировка была сегодня (информация уже есть в карточке)
     if (last.date === todayStr) return null
     return last
   }, [todayStr])
 
-  const upcoming = useMemo((): (UpcomingWorkoutItem & { 
+  const upcoming = useMemo((): (UpcomingWorkoutItem & {
     status: 'completed' | 'missed' | 'next' | 'upcoming'
   })[] => {
-    if (!schedule || !plan) return []
-    const dates = getUpcomingScheduleDates(schedule, 6)
-    
-    // Находим первую невыполненную тренировку
+    if (!schedule || !plan || plannedDates.length === 0) return []
+
+    const sorted = [...plannedDates].sort((a, b) => a.date.localeCompare(b.date))
     let foundNext = false
-    
-    return dates.map(({ date, dayOfWeek }) => {
-      const workoutId = schedule.byDay[dayOfWeek]
+
+    return sorted.map(({ date: dateStr, workoutId }) => {
       const workout = getWorkoutByIdFromPlan(workoutId, plan)
       if (!workout) return null
       const exercises = buildWorkoutWithWeights(workout, weights)
-      const dateStr = dateToLocalDateString(date)
       const isToday = dateStr === todayStr
       const isCompleted = wasWorkoutCompletedOnDate(dateStr, workoutId)
       const isPast = dateStr < todayStr
-      
+
       let status: 'completed' | 'missed' | 'next' | 'upcoming'
       if (isToday && isCompleted) {
         status = 'completed'
@@ -78,22 +96,32 @@ export function UpcomingWorkouts({ onStartWorkout }: UpcomingWorkoutsProps) {
       } else {
         status = 'upcoming'
       }
-      
+
       return {
         date: dateStr,
-        dayName: DAY_NAMES[dayOfWeek] ?? '',
+        dayName: getDayName(dateStr),
         workoutId,
         workoutName: workout.name,
         exercises,
         status,
       }
-    }).filter(Boolean) as (UpcomingWorkoutItem & { 
+    }).filter(Boolean) as (UpcomingWorkoutItem & {
       status: 'completed' | 'missed' | 'next' | 'upcoming'
     })[]
-  }, [schedule, plan, weights, todayStr])
+  }, [schedule, plan, weights, todayStr, plannedDates])
 
   const handleStart = (item: UpcomingWorkoutItem) => {
     onStartWorkout(item)
+  }
+
+  const handleSaveDate = (oldDate: string, workoutId: string, newDate: string) => {
+    if (!schedule) return
+    const next = plannedDates.map((p) =>
+      p.date === oldDate && p.workoutId === workoutId ? { ...p, date: newDate } : p
+    )
+    setPlannedScheduleDates(next)
+    setPlannedDates(next)
+    setEditingDateFor(null)
   }
 
   if (!schedule) return <p className="text-beefy-text-secondary dark:text-beefy-dark-text-muted">Нет расписания.</p>
@@ -131,7 +159,7 @@ export function UpcomingWorkouts({ onStartWorkout }: UpcomingWorkoutsProps) {
               }`}
             >
               <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   {isNext && (
                     <span className="text-beefy-primary dark:text-beefy-cream-light text-xs font-semibold bg-beefy-primary/10 dark:bg-beefy-purple/20 px-2 py-0.5 rounded">
                       Следующая
@@ -140,6 +168,13 @@ export function UpcomingWorkouts({ onStartWorkout }: UpcomingWorkoutsProps) {
                   <span className="font-medium text-beefy-primary dark:text-beefy-dark-text text-sm sm:text-base">
                     {item.dayName}, {formatDate(new Date(item.date + 'T12:00:00'))}
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => setEditingDateFor({ date: item.date, workoutId: item.workoutId, workoutName: item.workoutName })}
+                    className="text-xs text-beefy-text-secondary dark:text-beefy-dark-text-muted hover:text-beefy-primary dark:hover:text-beefy-dark-text underline"
+                  >
+                    Изменить дату
+                  </button>
                 </div>
                 <div className="flex items-center gap-2">
                   {isCompleted && (
@@ -174,15 +209,91 @@ export function UpcomingWorkouts({ onStartWorkout }: UpcomingWorkoutsProps) {
                 >
                   Начать
                 </button>
+              ) : isMissed ? (
+                <button
+                  type="button"
+                  onClick={() => handleStart(item)}
+                  className="w-full min-h-[48px] py-3 sm:py-2.5 bg-amber-500 dark:bg-amber-600 text-white text-sm font-medium rounded-lg hover:opacity-90 active:opacity-80 touch-manipulation"
+                >
+                  Начать (пропущенная)
+                </button>
               ) : (
                 <div className="w-full min-h-[48px] py-3 sm:py-2.5 flex items-center justify-center rounded-lg bg-beefy-cream/30 dark:bg-beefy-dark-bg-card/50 text-beefy-text-secondary dark:text-beefy-dark-text-muted text-sm">
-                  {isMissed ? 'Пропущена' : 'Предстоящая'}
+                  Предстоящая
                 </div>
               )}
             </li>
           )
         })}
       </ul>
+      {editingDateFor && (
+        <ChangeDateModal
+          workoutName={editingDateFor.workoutName}
+          currentDate={editingDateFor.date}
+          onSave={(newDate) => handleSaveDate(editingDateFor.date, editingDateFor.workoutId, newDate)}
+          onCancel={() => setEditingDateFor(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+interface ChangeDateModalProps {
+  workoutName: string
+  currentDate: string
+  onSave: (newDate: string) => void
+  onCancel: () => void
+}
+
+function ChangeDateModal({ workoutName, currentDate, onSave, onCancel }: ChangeDateModalProps) {
+  const [date, setDate] = useState(currentDate)
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 dark:bg-black/70"
+      onClick={onCancel}
+    >
+      <div
+        className="bg-white dark:bg-beefy-dark-bg-card rounded-xl shadow-lg p-6 w-full max-w-sm border border-beefy-primary/20 dark:border-beefy-dark-border"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="text-lg font-semibold text-beefy-primary dark:text-beefy-dark-text mb-2">
+          Изменить дату
+        </h3>
+        <p className="text-sm text-beefy-text-secondary dark:text-beefy-dark-text-muted mb-4">
+          {workoutName}
+        </p>
+        <div className="space-y-4">
+          <div>
+            <label htmlFor="schedule-date-input" className="block text-sm font-medium text-beefy-primary dark:text-beefy-dark-text mb-2">
+              Дата
+            </label>
+            <input
+              id="schedule-date-input"
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="w-full max-w-full min-h-[48px] px-4 py-2 text-base border-2 border-beefy-primary/30 dark:border-beefy-dark-border rounded-lg bg-white dark:bg-beefy-dark-bg text-beefy-primary dark:text-beefy-dark-text box-border"
+            />
+          </div>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="flex-1 min-h-[48px] px-4 py-2 text-sm font-medium rounded-lg border border-beefy-primary/20 dark:border-beefy-dark-border text-beefy-primary dark:text-beefy-dark-text hover:bg-beefy-cream/50 dark:hover:bg-beefy-dark-border/30 transition-colors"
+            >
+              Отмена
+            </button>
+            <button
+              type="button"
+              onClick={() => onSave(date)}
+              className="flex-1 min-h-[48px] px-4 py-2 text-sm font-medium rounded-lg bg-beefy-primary dark:bg-beefy-purple text-white hover:opacity-90 active:opacity-80 transition-opacity"
+            >
+              Сохранить
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

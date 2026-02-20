@@ -80,7 +80,7 @@ export function getWorkoutById(workoutId: string): WorkoutTemplate | undefined {
 function generateWarmupSets(workingWeight: number, exerciseId: string): WorkSet[] {
   // Минимальный порог для включения разминки (кг)
   // Для гантелей (обычно легче) - 10 кг, для остального - 20 кг
-  const MIN_WEIGHT_FOR_WARMUP = exerciseId === 'rumynskaya' || exerciseId === 'zhim-naklon' ? 10 : 20
+  const MIN_WEIGHT_FOR_WARMUP = 20
   
   if (workingWeight < MIN_WEIGHT_FOR_WARMUP) {
     return []
@@ -162,9 +162,9 @@ export function buildWorkoutWithWeights(
 
 /** Шаг добавления веса: гантели +1 кг, остальное +2.5 кг */
 const ADD_STEP_KG: Record<string, number> = {
-  rumynskaya: 1,
+  rumynskaya: 2.5,
   'yagodichnyj-most': 2.5,
-  'zhim-naklon': 1,
+  'zhim-naklon': 2.5,
   giperekstenziya: 2.5,
 }
 const DEFAULT_ADD_KG = 2.5

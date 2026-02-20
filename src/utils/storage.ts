@@ -10,6 +10,7 @@ const KEY_MEASUREMENTS = 'body_measurements'
 const KEY_THEME = 'app_theme'
 const KEY_EXERCISE_SETTINGS = 'exercise_settings'
 const KEY_DATA_VERSION = 'data_version'
+const KEY_SCHEDULE_DATES = 'workout_schedule_dates'
 
 // Версия схемы данных (увеличиваем при изменениях структуры)
 const CURRENT_DATA_VERSION = 2
@@ -160,6 +161,63 @@ export function setBodyMeasurements(entries: BodyMeasurementEntry[]): void {
   localStorage.setItem(KEY_MEASUREMENTS, JSON.stringify(entries))
 }
 
+function tryParseJson(s: string | null): unknown {
+  if (s == null) return null
+  try {
+    return JSON.parse(s)
+  } catch {
+    return s
+  }
+}
+
+/** Экспорт всех данных приложения в JSON-строку (для резервной копии). */
+export function exportAppData(): string {
+  const data: Record<string, unknown> = {
+    [KEY_PLANS]: tryParseJson(localStorage.getItem(KEY_PLANS)),
+    [KEY_SCHEDULE]: tryParseJson(localStorage.getItem(KEY_SCHEDULE)),
+    [KEY_NEXT_WEIGHTS_BY_PLAN]: tryParseJson(localStorage.getItem(KEY_NEXT_WEIGHTS_BY_PLAN)),
+    [KEY_WEIGHTS]: localStorage.getItem(KEY_WEIGHTS),
+    [KEY_ONBOARDING]: localStorage.getItem(KEY_ONBOARDING),
+    [KEY_HISTORY]: tryParseJson(localStorage.getItem(KEY_HISTORY)),
+    [KEY_MEASUREMENTS]: tryParseJson(localStorage.getItem(KEY_MEASUREMENTS)),
+    [KEY_EXERCISE_SETTINGS]: tryParseJson(localStorage.getItem(KEY_EXERCISE_SETTINGS)),
+    [KEY_SCHEDULE_DATES]: tryParseJson(localStorage.getItem(KEY_SCHEDULE_DATES)),
+    [KEY_DATA_VERSION]: localStorage.getItem(KEY_DATA_VERSION),
+  }
+  return JSON.stringify(data)
+}
+
+/** Импорт данных из JSON-строки. Возвращает результат операции. */
+export function importAppData(jsonString: string): { success: boolean; error?: string } {
+  try {
+    const data = JSON.parse(jsonString) as Record<string, unknown>
+    if (typeof data !== 'object' || data === null) {
+      return { success: false, error: 'Неверный формат' }
+    }
+    const keys = [
+      KEY_PLANS,
+      KEY_SCHEDULE,
+      KEY_NEXT_WEIGHTS_BY_PLAN,
+      KEY_WEIGHTS,
+      KEY_ONBOARDING,
+      KEY_HISTORY,
+      KEY_MEASUREMENTS,
+      KEY_EXERCISE_SETTINGS,
+      KEY_SCHEDULE_DATES,
+      KEY_DATA_VERSION,
+    ]
+    for (const k of keys) {
+      const v = data[k]
+      if (v !== undefined && v !== null) {
+        localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v))
+      }
+    }
+    return { success: true }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Ошибка разбора JSON' }
+  }
+}
+
 /** Сброс только программы: планы, расписание, веса, онбординг, настройки упражнений. История и замеры сохраняются. */
 export function resetProgram(): void {
   localStorage.removeItem(KEY_PLANS)
@@ -168,6 +226,7 @@ export function resetProgram(): void {
   localStorage.removeItem(KEY_NEXT_WEIGHTS_BY_PLAN)
   localStorage.removeItem(KEY_ONBOARDING)
   localStorage.removeItem(KEY_EXERCISE_SETTINGS)
+  localStorage.removeItem(KEY_SCHEDULE_DATES)
 }
 
 /** Сброс всех данных приложения: планы, расписание, веса, онбординг, история, замеры. Тема сохраняется. */
@@ -219,6 +278,39 @@ export function getUpcomingScheduleDates(
     }
   }
   return result
+}
+
+export interface PlannedWorkoutDate {
+  date: string // YYYY-MM-DD
+  workoutId: string
+}
+
+/** Запланированные даты тренировок (6 слотов). Если пусто или устарели — вычисляются из расписания. */
+export function getPlannedScheduleDates(schedule: WorkoutSchedule): PlannedWorkoutDate[] {
+  const todayStr = getTodayDateString()
+  try {
+    const raw = localStorage.getItem(KEY_SCHEDULE_DATES)
+    if (raw) {
+      const stored = JSON.parse(raw) as PlannedWorkoutDate[]
+      if (Array.isArray(stored) && stored.length === 6) {
+        const allFutureOrToday = stored.every((s) => s.date >= todayStr)
+        if (allFutureOrToday) return stored
+      }
+    }
+  } catch {
+    // ignore
+  }
+  const dates = getUpcomingScheduleDates(schedule, 6)
+  const result: PlannedWorkoutDate[] = dates.map(({ date, dayOfWeek }) => ({
+    date: dateToLocalDateString(date),
+    workoutId: schedule.byDay[dayOfWeek],
+  }))
+  setPlannedScheduleDates(result)
+  return result
+}
+
+export function setPlannedScheduleDates(planned: PlannedWorkoutDate[]): void {
+  localStorage.setItem(KEY_SCHEDULE_DATES, JSON.stringify(planned))
 }
 
 /** Настройки упражнений: exerciseId → ExerciseSettings */

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { getBodyMeasurements, addBodyMeasurement, setBodyMeasurements, getTodayDateString } from '@/utils/storage'
 import { seedBodyMeasurements } from '@/dev/seedHistory'
 import type { BodyMeasurementKey, BodyMeasurementEntry } from '@/types'
@@ -27,12 +27,29 @@ function getLastMeasurementValues(): Partial<Record<BodyMeasurementKey, number>>
   return sorted[0]?.values ?? {}
 }
 
+function lastValuesToStrings(): Partial<Record<BodyMeasurementKey, string>> {
+  const last = getLastMeasurementValues()
+  const out: Partial<Record<BodyMeasurementKey, string>> = {}
+  for (const k of MEASUREMENT_KEYS) {
+    const v = last[k]
+    out[k] = v != null ? String(v) : ''
+  }
+  return out
+}
+
 export function MeasurementsPage() {
   const [entries, setEntries] = useState<BodyMeasurementEntry[]>(() => getBodyMeasurements())
   const [date, setDate] = useState(getTodayDateString())
-  const [values, setValues] = useState<Partial<Record<BodyMeasurementKey, number>>>(getLastMeasurementValues)
+  const [valueStrings, setValueStrings] = useState<Partial<Record<BodyMeasurementKey, string>>>(lastValuesToStrings)
+  const [savedMessageVisible, setSavedMessageVisible] = useState(false)
 
   const refresh = () => setEntries(getBodyMeasurements())
+
+  useEffect(() => {
+    if (!savedMessageVisible) return
+    const t = setTimeout(() => setSavedMessageVisible(false), 3000)
+    return () => clearTimeout(t)
+  }, [savedMessageVisible])
 
   const handleSeedMeasurements = () => {
     const seeded = seedBodyMeasurements()
@@ -42,16 +59,30 @@ export function MeasurementsPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    const values: Partial<Record<BodyMeasurementKey, number>> = {}
+    for (const k of MEASUREMENT_KEYS) {
+      const s = valueStrings[k]?.trim()
+      if (s === '') continue
+      const v = parseFloat(s!.replace(',', '.'))
+      if (!Number.isNaN(v) && v >= 0) values[k] = v
+    }
     const hasAny = MEASUREMENT_KEYS.some((k) => values[k] != null && values[k]! > 0)
     if (!hasAny) return
     addBodyMeasurement({ date, values })
     setDate(getTodayDateString())
     refresh()
-    setValues(getLastMeasurementValues())
+    setValueStrings(lastValuesToStrings())
+    setSavedMessageVisible(true)
   }
 
   return (
     <div className="space-y-6 w-full max-w-xl min-w-0">
+      {savedMessageVisible && (
+        <div className="rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/30 px-4 py-3 flex items-center gap-2">
+          <span className="text-emerald-600 dark:text-emerald-400 text-lg" aria-hidden>✓</span>
+          <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">Замеры сохранены</p>
+        </div>
+      )}
       <section className="bg-white dark:bg-beefy-dark-bg-card rounded-xl border border-beefy-primary/20 dark:border-beefy-dark-border p-4 shadow-sm min-w-0 overflow-hidden">
         <h2 className="text-lg font-semibold text-beefy-primary dark:text-beefy-dark-text mb-4">Добавить замер</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -71,14 +102,15 @@ export function MeasurementsPage() {
                   {MEASUREMENT_LABELS[key]}, {getUnit(key)}
                 </label>
                 <input
-                  type="number"
-                  min={0}
-                  step={0.5}
+                  type="text"
                   inputMode="decimal"
-                  value={values[key] ?? ''}
+                  placeholder="0"
+                  value={valueStrings[key] ?? ''}
                   onChange={(e) => {
-                    const v = e.target.value === '' ? undefined : parseFloat(e.target.value)
-                    setValues((prev) => (v != null && !Number.isNaN(v) ? { ...prev, [key]: v } : { ...prev, [key]: undefined }))
+                    const raw = e.target.value
+                    if (raw === '' || /^[0-9]*[,.]?[0-9]*$/.test(raw)) {
+                      setValueStrings((prev) => ({ ...prev, [key]: raw }))
+                    }
                   }}
                   className="w-full min-h-[44px] rounded-lg border border-beefy-primary/30 dark:border-beefy-dark-border bg-white dark:bg-beefy-dark-bg text-beefy-primary dark:text-beefy-dark-text px-3 py-2 text-right"
                 />
